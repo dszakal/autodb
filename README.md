@@ -1,5 +1,5 @@
 # autodb
 
-Not ready yet, please ignore
+NOT READY YET, please ignore
 
 A very simple automated single table read-write Active Record Pattern implementation.

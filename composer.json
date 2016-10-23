@@ -9,7 +9,9 @@
             "email": "dszakal89@icloud.com"
         }
     ],
-    "require": {},
+    "require": {
+        
+    },
     "require-dev": {
         
     },
