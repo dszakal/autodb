@@ -32,18 +32,21 @@ class AutoRecord {
         
     }
     
-    public function attr($column, $setVaule = null) {
-        if ($setVaule === null) { // getter mode
+    public function attr($column, $setValue = null) {
+        if ($setValue === null) { // getter mode
             if (isset($this->_attributes[$column]) && isset($this->_columnRules[$column])) {
                 return $this->_attributes[$column];
             }
             throw new Exception("AutoDB/AutoRecord Not existing attribute called for $this->_tableName : $column");
         }
+        
+        //setter mode
         if (isset($this->_attributes[$column]) && isset($this->_columnRules[$column])) {
-            // todo setter 
-            $value = $this->escape($setVaule);
-            $this->_attributes[$column] = $value;
-            return $value; // for consistency return with the escaped value
+            if (!$this->validate($this->_attributes[$column], $setValue)) {
+                 throw new Exception("AutoDB/AutoRecord Invalid Data attribute added for $this->_tableName : $column : $setValue");
+            }
+            $this->_attributes[$column] = $setValue;
+            return $setValue; // for consistency return with the escaped value
         }
         throw new Exception("AutoDB/AutoRecord Not existing attribute called for $this->_tableName : $column");
     }
