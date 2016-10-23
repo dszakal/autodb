@@ -1,0 +1,21 @@
+{
+    "name": "dszakal/autodb",
+    "description": "AutoDB package",
+    "license": "BSD",
+    "keywords": ["autodb"],
+    "authors": [
+        {
+            "name": "Daniel Szakal",
+            "email": "dszakal89@icloud.com"
+        }
+    ],
+    "require": {},
+    "require-dev": {
+        
+    },
+    "autoload": {
+        "psr-4": {
+            "AutoDb\\": "src"
+        }
+    }
+}
