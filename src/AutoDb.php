@@ -19,7 +19,7 @@ class AutoDb {
         
     public static function init($sqlResource, $redisInstance = null) {
         if (!($sqlResource instanceof mysqli)) {
-            throw new Exception('Only MySQL functionality is implemented yet');
+            throw new Exception('AutoDB/AutoRecord: Only MySQL functionality is implemented yet');
         }
         return new AutoDb($sqlResource, $redisInstance);
     }
