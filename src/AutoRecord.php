@@ -63,10 +63,12 @@ class AutoRecord {
             return $record;
         }
         
-        // existing row
+        // existing row in object cache (ensuring same reference
         if (isset($autoDb->getRecordInstances()[$this->_primaryKey][$value])) {
             return $autoDb->getRecordInstances()[$this->_primaryKey][$value];
         }
+        
+        // load object from database query:
         
         $autoDb->_addInstance($record); // so it will return next time the same reference
     }
