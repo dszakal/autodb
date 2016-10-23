@@ -11,7 +11,7 @@ class AutoDb {
      * // array of AutoRecord->_columnRules
      * @var array - example $this->_tableDefs[$tablename][$column1]['primary_key']
      */
-    private $_tableDefs = array();
+    private $_tableDefs = array(); // TODO
     
     private $_redisInstance;
     private $_sqlResource;
@@ -126,7 +126,7 @@ class AutoDb {
         }
         
         // worst case: we fell back to getting the show create table
-        $this->_tableDefs[$tablename] = $this->_makeTableDefRow();
+        $this->_tableDefs[$tablename] = $this->_makeTableDefRow($tablename);
         if ($this->_redisInstance instanceof Redis) {
             $tableRow = $this->_redisInstance->set('autodbdefs.' . $this->_connectionIdent . '.' . $tablename, 
                 $this->_tableDefs[$tablename],
@@ -136,9 +136,9 @@ class AutoDb {
     }
     
     /**
-     * todo
+     * TODO
      */
-    private function _makeTableDefRow()
+    private function _makeTableDefRow($table)
     {
         $ret = array();
         

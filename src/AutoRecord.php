@@ -11,7 +11,7 @@ class AutoRecord {
     
     /**
      *
-     * @var array - ['column']['column_properties']
+     * @var array - ['column']['column_properties'] - TODO
      */
     private $_columnRules = array();
     
@@ -50,6 +50,8 @@ class AutoRecord {
         $this->_tableName = $table;
         $this->_columnRules = $columnRules;
         $this->_sqlResource = $sqlResource;
+        
+        // todo $this->_primary_key after tabledefs
     }
     
     public static function loadRow(AutoDb $autoDb, $table, $keyname = null, $value = null) 
@@ -62,7 +64,9 @@ class AutoRecord {
         }
         
         // existing row
-        
+        if (isset($autoDb->getRecordInstances()[$this->_primaryKey][$value])) {
+            return $autoDb->getRecordInstances()[$this->_primaryKey][$value];
+        }
         
         $autoDb->_addInstance($record); // so it will return next time the same reference
     }
