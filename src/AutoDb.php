@@ -8,7 +8,7 @@ use Redis;
 class AutoDb {
     
     /**
-     *
+     * // array of AutoRecord->_columnRules
      * @var array - example $this->_tableDefs[$tablename][$column1]['primary_key']
      */
     private $_tableDefs = array();
@@ -55,15 +55,62 @@ class AutoDb {
         return $this->_recordInstances;
     }
     
-    public function row($table, $keyname, $value) {
+    /**
+     * Create a new instance of a later possible row in the database
+     * Final - Just AutoRecord::loadRow($this, $table, $keyname, null);
+     * 
+     * @param type $table
+     * @param type $keyname
+     * @param type $value
+     * @return AutoRecord
+     */
+    public final function newRow($table) 
+    {
+        AutoRecord::loadRow($this, $table, null);
+    }
+    
+    /**
+     * Get a row from the db: existing reference or load if not exists
+     * Final - Just AutoRecord::loadRow($this, $table, $keyname, $value);
+     * 
+     * @param type $table
+     * @param type $keyname
+     * @param type $value
+     * @return AutoRecord
+     */
+    public final function row($table, $keyname, $value) 
+    {
         AutoRecord::loadRow($this, $table, $keyname, $value);
     }
     
-    public function rowsArray($table, $where, $limit = -1, $page = 1) {
+    /**
+     * Get a set of rows in an array based on a where condition.
+     * Final - Just AutoRecord::loadRows($this, $table, $where, $limit, $page);
+     * 
+     * @param type $table
+     * @param type $where
+     * @param type $limit
+     * @param type $page
+     * @return array - array of AutoRecord instances
+     */
+    public final function rowsArray($table, $where, $limit = -1, $page = 1) 
+    {
         AutoRecord::loadRows($this, $table, $where, $limit, $page);
     }
     
-    public function getTableDef($tablename) {
+    /**
+     * DO NOT USE, unless you are AutoRecord class loadRow and loadRowsWhere method
+     * Needs to be public as this is not C++, no friend classes in PHP :(
+     * 
+     * @param \AutoDb\AutoRecord $record
+     */
+    public final function _addInstance(AutoRecord $record)
+    {
+        $_recordInstances[$record->getTableName()][$record->getPrimaryKeyValue()] = $record;
+    }
+    
+    public function getTableDef($tablename) 
+    {
         // first check current instance
         if (isset($this->_tableDefs[$tablename])) {
             return $this->_tableDefs[$tablename];
