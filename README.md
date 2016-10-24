@@ -6,7 +6,11 @@ A very simple automated single table read-write Active Record Pattern implementa
 
 LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
 
-    This is not ORM. Just an active record pattern, it doesn't support joins on purpose. 
+    This is not ORM. Just an active record pattern, it doesn't support joins on purpose.
+    One AutoRecord instance = one row in one database's one table
+    One AutoDb instance <-> One SQL database
+    One Database, one Table two calls for Primary key -> use the same AutoDb instance and you will never have a duplicated AutoRecord instance
+    Redis is an optional dependency for caching table describes (not tested yet)
     Also save(), row(), rowsArray() and newRow() are final for a reason
     For now, supports only MySQL
     For now, supports only databases with auto_increment positive integer primary keys (planned to work with unique keys too)
