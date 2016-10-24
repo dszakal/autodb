@@ -1,6 +1,6 @@
 # autodb
 
-NOT READY YET, please ignore
+UNTESTED, please test before using
 
 A very simple automated single table read-write Active Record Pattern implementation.
 
@@ -8,7 +8,7 @@ LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
 
     This is not ORM. Just an active record pattern, it doesn't support joins on purpose.
     One AutoRecord instance = one row in one database's one table
-    One AutoDb instance <-> One SQL database
+    One AutoDb instance <-> One SQL database connection
     One Database, one Table two calls for Primary key -> use the same AutoDb instance and you will never have a duplicated AutoRecord instance
     Redis is an optional dependency for caching table describes (not tested yet)
     Also save(), row(), rowsArray() and newRow() are final for a reason
@@ -37,4 +37,4 @@ Usage example:
     
     // for array of AutoRecord instances with one single query (and returns object cache version if exists)
     $arrayRecords = $autoDb->rowsArray($table, $where, $limit, $page); // limit default is 100, page defaults to 1 which returns 0-100
-    
+    // this feature is not tested yet, beware
