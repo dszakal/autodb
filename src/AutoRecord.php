@@ -11,7 +11,7 @@ class AutoRecord {
     
     /**
      *
-     * @var array - ['column']['column_properties'] - TODO
+     * @var array - ['column']['column_properties']
      */
     private $_columnRules = array();
     
@@ -58,6 +58,7 @@ class AutoRecord {
         
     protected function __construct(AutoDb $autoDb, $table, $columnRules, $sqlResource) 
     {
+        $this->_autoDb = $autoDb;
         $this->_tableName = $table;
         $this->_columnRules = $columnRules;
         $this->_sqlResource = $sqlResource;
@@ -106,6 +107,7 @@ class AutoRecord {
         }
         
         $autoDb->_addInstance($record); // so it will return next time the same reference
+        return $record;
     }
    
     /**
@@ -130,8 +132,8 @@ class AutoRecord {
         $result = $sqlr->query($sqlGet);
         while ($row = $result->fetch_assoc()) {
             // get from cache if already existing to keep only one instance alive
-            if (isset($autoDb->getRecordInstances()[$columnRules['__primarykey']][$row[$columnRules['__primarykey']]])) {
-                $record = $autoDb->getRecordInstances()[$columnRules['__primarykey']][$row[$columnRules['__primarykey']]];
+            if (isset($autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]])) {
+                $record = $autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]];
             } else {
                 $record = new static($autoDb, $table, $columnRules, $sqlr);
                 $record->initAttrsFromQueryRow($row);
@@ -182,6 +184,24 @@ class AutoRecord {
         return $this->attr($this->_primaryKey);
     }
     
+    private function _getCommasAndEscapes($type, $value) {
+        if ($this->_sqlResource instanceof mysqli) {
+            $sqlr = $this->_sqlResource;
+            if (strstr($type, 'int')) {
+                return (int)$value;
+            }
+            if (strstr($type, 'dec')) {
+                throw new Exception("AutoDb/Autorecord: decimal safe escape not 9mplemented yet :(");
+            }
+            if (strstr($type, 'float') || strstr($type, 'double' || strstr($type, 'real'))) {
+                return (double)$value;
+            }
+            if (strstr($type, 'text') || strstr($type, 'char') || strstr($type, 'date') || strstr($type, 'time')) {
+                return "'" . $sqlr->real_escape_string($value) . "'";
+            }
+        }
+    }
+    
     /**
      * Save - final - only saves single row
      */
@@ -190,13 +210,31 @@ class AutoRecord {
         if ($this->getPrimaryKeyValue() < 1) {
             // new row, insert
             if ($this->_sqlResource instanceof mysqli) {
-                $sql = 'INSERT INTO ';
+                $sqlr = $this->_sqlResource;
+                $sql = 'INSERT INTO ' . $sqlr->real_escape_string($this->getTableName()). ' ';
                 
-                // todo inserts and values
+                $colNames = '';
+                $values = '';
+                
+                $comma = false;
+                foreach ($this->_rowChanged as $row) {
+                    if (!$comma) {
+                        $comma = true;
+                    } else {
+                        $colNames .= ',';
+                        $values .= ',';
+                    }
+                    $colNames .= $sqlr->real_escape_string($row);
+                    $values .= $this->_getCommasAndEscapes($this->_columnRules[$row]['type'], $this->_attributes[$row]);
+                }
+                
+                $sql .= "( $colNames ) VALUES ( $values )";
                 
                 if (!$this->_sqlResource->query($sql)) {
-                    throw new Exception("AutoDb/Autorecord: error inserting new record: " . $sql);
+                    throw new Exception("AutoDb/Autorecord: error inserting new record: " . $sql . " " . $this->_sqlResource->error);
                 }
+                $this->_attributes[$this->getPrimaryKey()] = $this->_sqlResource->insert_id;
+                $this->_autoDb->_addInstance($this); // add new object to pool
                 return;
             }
             
@@ -209,18 +247,24 @@ class AutoRecord {
         }
         
         if ($this->_sqlResource instanceof mysqli) {
-            $sql = 'UPDATE SET ';
+            $sqlr = $this->_sqlResource;
+            $sql = 'UPDATE ' . $sqlr->real_escape_string($this->getTableName()) . ' SET ';
 
+            $comma = false;
             foreach ($this->_rowChanged as $row) {
-                // todo rows and values
+                if (!$comma) {
+                    $comma = true;
+                } else {
+                    $sql .= ',';
+                }
+                $sql .= ' ' . $sqlr->real_escape_string($row) . ' = ' . 
+                    $this->_getCommasAndEscapes($this->_columnRules[$row]['type'], $this->_attributes[$row]);
             }
 
             $sql .= " WHERE $this->_primaryKey = " . (int)$this->attr($this->_primaryKey);
             if (!$this->_sqlResource->query($sql)) {
                 throw new Exception("AutoDb/Autorecord: error inserting new record: " . $sql . " " . $this->_sqlResource->error);
             }
-            $this->_attributes[$this->getPrimaryKey()] = $this->_sqlResource->insert_id;
-            $this->_autoDb->_addInstance($this);
             return;
         }
     }

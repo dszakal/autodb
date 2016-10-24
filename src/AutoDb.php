@@ -71,7 +71,7 @@ class AutoDb {
      */
     public final function newRow($table) 
     {
-        AutoRecord::loadRow($this, $table, null);
+        return AutoRecord::loadRow($this, $table, null);
     }
     
     /**
@@ -85,7 +85,7 @@ class AutoDb {
      */
     public final function row($table, $keyname, $value) 
     {
-        AutoRecord::loadRow($this, $table, $keyname, $value);
+        return AutoRecord::loadRow($this, $table, $keyname, $value);
     }
     
     /**
@@ -100,7 +100,7 @@ class AutoDb {
      */
     public final function rowsArray($table, $where, $limit = -1, $page = 1) 
     {
-        AutoRecord::loadRows($this, $table, $where, $limit, $page);
+        return AutoRecord::loadRows($this, $table, $where, $limit, $page);
     }
     
     /**
