@@ -16,6 +16,7 @@ LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
     For now, supports only databases with auto_increment positive integer primary keys (planned to work with unique keys too)
     For now, we do not support editing of primary keys, but you should do that manually and carefully anyway
     For now, type checking is very basic, will improve
+    For now, uses php stock Exception class, will create an own one
 
 Usage example:
 
