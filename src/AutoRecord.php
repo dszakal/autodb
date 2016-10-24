@@ -70,10 +70,18 @@ class AutoRecord {
         }
     }
     
+    private function initAttrsFromQueryRow(array $row)
+    {
+        foreach ($row as $key => $value) {
+            $this->_attributes[$key] = $value;
+        }
+    }
+    
     public static function loadRow(AutoDb $autoDb, $table, $keyname = null, $value = null) 
     {
         $columnRules = $autoDb->getTableDef($table);
-        $record = new static($autoDb, $table, $columnRules, $autoDb->getSqlResource());
+        $sqlr = $autoDb->getSqlResource();
+        $record = new static($autoDb, $table, $columnRules, $sqlr);
         // new row
         if (is_null($value)) {
             $record->initAttrsEmpty();
@@ -81,12 +89,21 @@ class AutoRecord {
         }
         
         // existing row in object cache (ensuring same reference
-        if (isset($autoDb->getRecordInstances()[$this->_primaryKey][$value])) {
-            return $autoDb->getRecordInstances()[$this->_primaryKey][$value];
+        if (isset($autoDb->getRecordInstances()[$table][$value])) {
+            return $autoDb->getRecordInstances()[$table][$value];
         }
         
         // load object from database query:
+        $sqlGet = "SELECT * FROM " . $sqlr->real_escape_string($table) . 
+            " WHERE " . $sqlr->real_escape_string($keyname) . " = " . (int)$value;
         
+        $result = $sqlr->query($sqlGet);
+        if ($result) {
+            $row = $result->fetch_assoc();
+            $record->initAttrsFromQueryRow($row);
+        } else {
+            throw new Exception("AutoDb/Autorecord: error loading record with PKey: " . $sqlGet . " " . $sqlr->error);
+        }
         
         $autoDb->_addInstance($record); // so it will return next time the same reference
     }
@@ -95,7 +112,7 @@ class AutoRecord {
      * 
      * @param \AutoDb\AutoDb $AutoDb
      * @param string $table
-     * @param string $where
+     * @param string $where - BEWARE: UNESCAPED
      * @param int $limit
      * @param int $page
      * @return array
@@ -103,10 +120,25 @@ class AutoRecord {
     public static function loadRowsWhere(AutoDb $autoDb, $table, $where, $limit = 100, $page = 1) 
     {
         $columnRules = $autoDb->getTableDef($table);
+        $sqlr = $autoDb->getSqlResource();
         $ret = array();
         
-        // todo - new instances with one query
-        // $record = new static($table, $columnRules, $autoDb->getSqlResource());
+        $sqlGet = "SELECT * FROM " . $sqlr->real_escape_string($table) . 
+            ' WHERE ' . $where
+            . ' LIMIT ' . (int)($limit * ($page-1)) . ' ' . (int)$limit;
+        
+        $result = $sqlr->query($sqlGet);
+        while ($row = $result->fetch_assoc()) {
+            // get from cache if already existing to keep only one instance alive
+            if (isset($autoDb->getRecordInstances()[$columnRules['__primarykey']][$row[$columnRules['__primarykey']]])) {
+                $record = $autoDb->getRecordInstances()[$columnRules['__primarykey']][$row[$columnRules['__primarykey']]];
+            } else {
+                $record = new static($autoDb, $table, $columnRules, $sqlr);
+                $record->initAttrsFromQueryRow($row);
+                $autoDb->_addInstance($record);
+            }
+            $ret[] = $record;
+        }
         
         return $ret;
     }

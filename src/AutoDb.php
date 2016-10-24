@@ -111,7 +111,7 @@ class AutoDb {
      */
     public final function _addInstance(AutoRecord $record)
     {
-        $_recordInstances[$record->getTableName()][$record->getPrimaryKeyValue()] = $record;
+        $this->_recordInstances[$record->getTableName()][$record->getPrimaryKeyValue()] = $record;
     }
     
     public function getTableDef($tablename) 
