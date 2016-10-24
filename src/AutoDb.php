@@ -98,7 +98,7 @@ class AutoDb {
      * @param type $page
      * @return array - array of AutoRecord instances
      */
-    public final function rowsArray($table, $where, $limit = -1, $page = 1) 
+    public final function rowsArray($table, $where, $limit = 100, $page = 1) 
     {
         return AutoRecord::loadRows($this, $table, $where, $limit, $page);
     }
