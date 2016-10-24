@@ -19,6 +19,8 @@ LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
 
 Usage example:
 
+```php
+    <?php
     // create a new row
     $autoDb = AutoDb::init($mysqli, $optionalRedis); 
     // $mysqli is instanceof mysqli right after you connected
@@ -38,3 +40,4 @@ Usage example:
     // for array of AutoRecord instances with one single query (and returns object cache version if exists)
     $arrayRecords = $autoDb->rowsArray($table, $where, $limit, $page); // limit default is 100, page defaults to 1 which returns 0-100
     // this feature is not tested yet, beware
+```
