@@ -5,12 +5,12 @@ NOT READY YET, please ignore
 A very simple automated single table read-write Active Record Pattern implementation.
 
 LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
-    This is not ORM. Just an active record pattern, it doesn't support joins on purpose. 
-    Also save(), row(), rowsArray() and newRow() are final for a reason
-    For now, supports only MySQL
-    For now, supports only databases with auto_increment positive integer primary keys (planned to work with unique keys too)
-    For now, we do not support editing of primary keys, but you should do that manually and carefully anyway
-    For now, type checking is very basic, will improve
+-This is not ORM. Just an active record pattern, it doesn't support joins on purpose. 
+-Also save(), row(), rowsArray() and newRow() are final for a reason
+-For now, supports only MySQL
+-For now, supports only databases with auto_increment positive integer primary keys (planned to work with unique keys too)
+-For now, we do not support editing of primary keys, but you should do that manually and carefully anyway
+-For now, type checking is very basic, will improve
 
 Usage:
     // create a new row
