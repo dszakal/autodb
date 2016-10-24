@@ -17,7 +17,18 @@ class AutoRecord {
     
     private $_rowChanged = array();
     
+    /**
+     *
+     * @var type AutoDb
+     */
+    private $_autoDb;
+    
+    /** 
+     *
+     * @var mysqli
+     */
     private $_sqlResource;
+    
     private $_primaryKey;
     
     public function getTableName() {
@@ -45,21 +56,27 @@ class AutoRecord {
     }
 
         
-    protected function __construct($table, $columnRules, $sqlResource) 
+    protected function __construct(AutoDb $autoDb, $table, $columnRules, $sqlResource) 
     {
         $this->_tableName = $table;
         $this->_columnRules = $columnRules;
         $this->_sqlResource = $sqlResource;
-        
-        // todo $this->_primary_key after tabledefs
+        $this->_primaryKey = $columnRules['__primarykey'];
+    }
+    
+    private function initAttrsEmpty() {
+        foreach ($this->_columnRules as $key => $value) {
+            $this->_attributes[$key] = null;
+        }
     }
     
     public static function loadRow(AutoDb $autoDb, $table, $keyname = null, $value = null) 
     {
         $columnRules = $autoDb->getTableDef($table);
-        $record = new static($table, $columnRules, $autoDb->getSqlResource());
+        $record = new static($autoDb, $table, $columnRules, $autoDb->getSqlResource());
         // new row
         if (is_null($value)) {
+            $record->initAttrsEmpty();
             return $record;
         }
         
@@ -69,6 +86,7 @@ class AutoRecord {
         }
         
         // load object from database query:
+        
         
         $autoDb->_addInstance($record); // so it will return next time the same reference
     }
@@ -94,19 +112,20 @@ class AutoRecord {
     }
     
     public function attr($column, $setValue = null) {
-        if ($setValue === null) { // getter mode
-            if (isset($this->_attributes[$column]) && isset($this->_columnRules[$column])) {
+        // getter mode
+        if (func_num_args() == 1) {
+            if (array_key_exists($column, $this->_attributes) && array_key_exists($column, $this->_columnRules)) {
                 return $this->_attributes[$column];
             }
             throw new Exception("AutoDB/AutoRecord Not existing attribute called for $this->_tableName : $column");
         }
         
         //setter mode
-        if (isset($this->_attributes[$column]) && isset($this->_columnRules[$column])) {
+        if (array_key_exists($column, $this->_attributes) && array_key_exists($column, $this->_columnRules)) {
             if (!$this->validate($this->_attributes[$column], $setValue)) {
                  throw new Exception("AutoDB/AutoRecord Invalid Data attribute added for $this->_tableName : $column : $setValue");
             }
-            if ($this->_attributes[$column] != $setValue) {
+            if ($this->_attributes[$column] !== $setValue) {
                 $this->_rowChanged[] = $column;
             }
             $this->_attributes[$column] = $setValue;
@@ -164,12 +183,14 @@ class AutoRecord {
                 // todo rows and values
             }
 
-            $sql .= " WHERE $this->_primaryKey = " . $this->attr($this->_primaryKey);
+            $sql .= " WHERE $this->_primaryKey = " . (int)$this->attr($this->_primaryKey);
             if (!$this->_sqlResource->query($sql)) {
-                throw new Exception("AutoDb/Autorecord: error inserting new record: " . $sql);
+                throw new Exception("AutoDb/Autorecord: error inserting new record: " . $sql . " " . $this->_sqlResource->error);
             }
+            $this->_attributes[$this->getPrimaryKey()] = $this->_sqlResource->insert_id;
+            $this->_autoDb->_addInstance($this);
             return;
-        }        
+        }
     }
     
     // Todo: multi saveMore (static, on array)

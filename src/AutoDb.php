@@ -14,6 +14,11 @@ class AutoDb {
     private $_tableDefs = array(); // TODO
     
     private $_redisInstance;
+    
+    /** 
+     *
+     * @var mysqli
+     */
     private $_sqlResource;
     
     public $redisTimeout = 3600;
@@ -142,7 +147,25 @@ class AutoDb {
     {
         $ret = array();
         
-        
+        if ($this->_sqlResource instanceof mysqli) {
+            $query = "Describe " . $this->_sqlResource->real_escape_string($table);
+
+            if ($result = $this->_sqlResource->query($query)) {
+                while ($row = $result->fetch_assoc()) {
+                    $ret[$row['Field']] = array();
+                    $ret[$row['Field']]['type'] = $row['Type'];
+                    $ret[$row['Field']]['nullable'] = $row['Null'];
+                    if (@$row['Key'] === 'PRI') {
+                        if (isset($ret['__primarykey']) || !strstr($row['Type'], 'int') || !strstr($row['Extra'], 'auto_increment')) {
+                            throw new Exception("AutoDB: Supported table definitions has exactly one auto_increment integer primary key");
+                        }
+                        $ret['__primarykey'] = $row['Field'];
+                    }
+                }
+            } else {
+                throw new Exception("AutoDB: cannot download table definition");
+            }
+        }
         
         return $ret;
     }
