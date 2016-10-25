@@ -22,7 +22,7 @@ Usage example:
 
 ```php
     <?php
-    // create a new row
+    // create a new AutoDb instance connecting to your database connection. One mysqli resource <-> One AutoDb
     $autoDb = AutoDb::init($mysqli, $optionalRedis); 
     // $mysqli is instanceof mysqli right after you connected
     // one $autoDb per connection is recommended, solve it with your own conatainer/singleton for best results
