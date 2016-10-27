@@ -100,7 +100,7 @@ class AutoDb {
      */
     public final function rowsArray($table, $where, $limit = 100, $page = 1) 
     {
-        return AutoRecord::loadRows($this, $table, $where, $limit, $page);
+        return AutoRecord::loadRowsWhere($this, $table, $where, $limit, $page);
     }
     
     /**
