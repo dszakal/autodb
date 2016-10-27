@@ -16,10 +16,13 @@ LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
     For now, supports only databases with auto_increment positive integer primary keys (planned to work with unique keys too)
     For now, we do not support editing of primary keys, but you should do that manually and carefully anyway
     For now, type checking is very basic, will improve
+    For now, uses php stock Exception class, will create an own one
 
 Usage example:
 
-    // create a new row
+```php
+    <?php
+    // create a new AutoDb instance connecting to your database connection. One mysqli resource <-> One AutoDb
     $autoDb = AutoDb::init($mysqli, $optionalRedis); 
     // $mysqli is instanceof mysqli right after you connected
     // one $autoDb per connection is recommended, solve it with your own conatainer/singleton for best results
@@ -38,3 +41,4 @@ Usage example:
     // for array of AutoRecord instances with one single query (and returns object cache version if exists)
     $arrayRecords = $autoDb->rowsArray($table, $where, $limit, $page); // limit default is 100, page defaults to 1 which returns 0-100
     // this feature is not tested yet, beware
+```
