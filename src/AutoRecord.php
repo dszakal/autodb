@@ -3,6 +3,7 @@
 namespace AutoDb;
 use mysqli;
 use Exception;
+use mysqli_result;
 
 class AutoRecord {
     
@@ -116,7 +117,7 @@ class AutoRecord {
    
     /**
      * 
-     * @param \AutoDb\AutoDb $AutoDb
+     * @param \AutoDb\AutoDb $autoDb
      * @param string $table
      * @param string $where - BEWARE: UNESCAPED
      * @param int $limit
@@ -134,19 +135,21 @@ class AutoRecord {
         
         $sqlGet = "SELECT * FROM " . $sqlr->real_escape_string($table) . 
             ' WHERE ' . $where
-            . ' LIMIT ' . (int)($limit * ($page-1)) . ' ' . (int)$limit;
+            . ' LIMIT ' . (int)($limit * ($page-1)) . ', ' . (int)$limit;
         
         $result = $sqlr->query($sqlGet);
-        while ($row = $result->fetch_assoc()) {
-            // get from cache if already existing to keep only one instance alive
-            if (isset($autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]])) {
-                $record = $autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]];
-            } else {
-                $record = new static($autoDb, $table, $columnRules, $sqlr);
-                $record->initAttrsFromQueryRow($row);
-                $autoDb->_addInstance($record);
+        if ($result instanceof mysqli_result) {
+            while ($row = $result->fetch_assoc()) {
+                // get from cache if already existing to keep only one instance alive
+                if (isset($autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]])) {
+                    $record = $autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]];
+                } else {
+                    $record = new static($autoDb, $table, $columnRules, $sqlr);
+                    $record->initAttrsFromQueryRow($row);
+                    $autoDb->_addInstance($record);
+                }
+                $ret[] = $record;
             }
-            $ret[] = $record;
         }
         
         return $ret;
