@@ -41,4 +41,17 @@ Usage example:
     // for array of AutoRecord instances with one single query (and returns object cache version if exists)
     $arrayRecords = $autoDb->rowsArray($table, $where, $limit, $page); // limit default is 100, page defaults to 1 which returns 0-100
     // this feature is not tested yet, beware
+    
+    // You may also get a previous but unsaved value of an attr you already saved:
+    echo $x->attr('username'); // 'changedPreviously'
+    $x->attr('username', 'changedAgain');
+    echo $x->attr('username'); // 'changedAgain'
+    echo $x->dbAttr('username'); // 'changedPreviously' - from instance
+    echo $x->dbAttrForce('username'); 'changedPreviously' - from database
+    $x->save(); // now all will be 'changedAgain'
+    
+    // AutoDb also supports Read only, Write once and blocked tables:
+    $autoDb->addBannedTable('sensitive_table');
+    $autoDb->addWriteOnceTable('my_strict_log');
+    $autoDb->addReadOnlyTable('categories');
 ```
