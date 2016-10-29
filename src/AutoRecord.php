@@ -17,6 +17,7 @@ class AutoRecord {
     private $_columnRules = array();
     
     private $_rowChanged = array();
+    private $_originals = array();
     
     /**
      *
@@ -171,11 +172,30 @@ class AutoRecord {
             }
             if ($this->_attributes[$column] !== $setValue) {
                 $this->_rowChanged[] = $column;
+                $this->_originals[$column] = $this->_attributes[$column];
             }
             $this->_attributes[$column] = $setValue;
             return $setValue; // for consistency return with the escaped value
         }
         throw new Exception("AutoDB/AutoRecord Not existing attribute called for $this->_tableName : $column");
+    }
+    
+    public function dbAttr($column)
+    {
+        return $this->_originals[$column];
+    }
+    
+    public function dbAttrForce($column)
+    {
+        $sqlr = $this->_sqlResource;
+        if ($sqlr instanceof mysqli) {
+            $sql = 'SELECT ' . $sqlr->real_escape_string($column) . ' FROM ' . $sqlr->real_escape_string($this->_tableName) .
+            ' WHERE ' . $this->getPrimaryKey() . ' = ' . (int)$this->getPrimaryKeyValue();
+            $result = $sqlr->query($sql);
+            $row = $result->fetch_assoc();
+            return $row[$column];
+        }
+        throw new Exception ("Autodb/autorecord - Forced column reader: wrong SQL resource instance or non existing row anymore");
     }
     
     public function validate($columnName, $value) {
@@ -248,6 +268,8 @@ class AutoRecord {
                 }
                 $this->_attributes[$this->getPrimaryKey()] = $this->_sqlResource->insert_id;
                 $this->_autoDb->_addInstance($this); // add new object to pool
+                $this->_rowChanged = array();
+                $this->_originals = array();
                 return;
             }
             
@@ -281,6 +303,8 @@ class AutoRecord {
             if (!$this->_sqlResource->query($sql)) {
                 throw new Exception("AutoDb/Autorecord: error inserting new record: " . $sql . " " . $this->_sqlResource->error);
             }
+            $this->_rowChanged = array();
+            $this->_originals = array();
             return;
         }
     }
