@@ -23,6 +23,11 @@ class AutoDb {
     
     public $redisTimeout = 3600;
     
+    // read and write limitation rules per table
+    private $_bannedTables = array();
+    private $_readOnlyTables = array();
+    private $_writeOnceTables = array(); // No update allowed
+    
     /**
      *
      * @var string - for the redis key
@@ -58,6 +63,34 @@ class AutoDb {
     
     public function getRecordInstances() {
         return $this->_recordInstances;
+    }
+    
+    public function getBannedTables() {
+        return $this->_bannedTables;
+    }
+
+    public function getReadOnlyTables() {
+        return $this->_readOnlyTables;
+    }
+
+    public function getWriteOnceTables() {
+        return $this->_writeOnceTables;
+    }
+
+    public function getConnectionIdent() {
+        return $this->_connectionIdent;
+    }
+    
+    public function addBannedTable($tablename) {
+        $this->_bannedTables[$tablename] = $tablename;
+    }
+    
+    public function addReadOnlyTable($tablename) {
+        $this->_readOnlyTables[$tablename] = $tablename;
+    }
+    
+    public function addWriteOnceTable($tablename) {
+        $this->_writeOnceTables[$tablename] = $tablename;
     }
     
     /**

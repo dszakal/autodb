@@ -80,6 +80,10 @@ class AutoRecord {
     
     public static function loadRow(AutoDb $autoDb, $table, $keyname = null, $value = null) 
     {
+        if (isset($autoDb->getBannedTables()[$table])) {
+            throw new Exception("AutoDb/Autorecord: this table is blocked to be used with autorecord");
+        }
+        
         $columnRules = $autoDb->getTableDef($table);
         $sqlr = $autoDb->getSqlResource();
         $record = new static($autoDb, $table, $columnRules, $sqlr);
@@ -121,6 +125,9 @@ class AutoRecord {
      */
     public static function loadRowsWhere(AutoDb $autoDb, $table, $where, $limit = 100, $page = 1) 
     {
+        if (isset($autoDb->getBannedTables()[$table])) {
+            throw new Exception("AutoDb/Autorecord: this table is blocked to be used with autorecord");
+        }
         $columnRules = $autoDb->getTableDef($table);
         $sqlr = $autoDb->getSqlResource();
         $ret = array();
@@ -207,6 +214,9 @@ class AutoRecord {
      */
     public final function save()
     {
+        if (array_key_exists($this->_tableName, $this->_autoDb->getReadOnlyTables())) {
+            throw new Exception("AutoDb/Autorecord: this table is read only, save is forbidden");
+        }
         if ($this->getPrimaryKeyValue() < 1) {
             // new row, insert
             if ($this->_sqlResource instanceof mysqli) {
@@ -242,6 +252,9 @@ class AutoRecord {
         }
         
         // Existing record, update
+        if (array_key_exists($this->_tableName, $this->_autoDb->getWriteOnceTables())) {
+            throw new Exception("AutoDb/Autorecord: this table is write-once, update is forbidden");
+        }
         if (empty($this->_rowChanged)) {
             return; // nothing to do, nothing changed
         }
