@@ -125,7 +125,7 @@ class AutoRecord {
      * @param int $page
      * @return array
      */
-    public static function loadRowsWhere(AutoDb $autoDb, $table, $where, $limit = 100, $page = 1) 
+    public static function loadRowsWhere(AutoDb $autoDb, $table, $where, $limit = -1, $page = 1) 
     {
         if (isset($autoDb->getBannedTables()[$table])) {
             throw new Exception("AutoDb/Autorecord: this table is blocked to be used with autorecord");
@@ -135,8 +135,11 @@ class AutoRecord {
         $ret = array();
         
         $sqlGet = "SELECT * FROM " . $sqlr->real_escape_string($table) . 
-            ' WHERE ' . $where
-            . ' LIMIT ' . (int)($limit * ($page-1)) . ', ' . (int)$limit;
+            ' WHERE ' . $where;
+        
+        if ($limit > 0) {
+            $sqlGet .= ' LIMIT ' . (int)($limit * ($page-1)) . ', ' . (int)$limit;
+        }
         
         $result = $sqlr->query($sqlGet);
         if ($result instanceof mysqli_result) {
@@ -182,7 +185,10 @@ class AutoRecord {
     
     public function dbAttr($column)
     {
-        return $this->_originals[$column];
+        if (isset($this->_originals[$column])) {
+            return $this->_originals[$column];
+        }
+        return $this->attr($column);
     }
     
     public function dbAttrForce($column)
