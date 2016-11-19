@@ -9,7 +9,7 @@ LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
     One AutoDb instance <-> One SQL database connection
     Static saveMore() and deleteMore() methods will only run on same AutoDb, same mysqli, same table rows, otherwise throwing AutoDbException. (Empty array won't throw)
     Also save(), row(), rowsArray(), newRow(), saveMore() and deleteMore() are final for a reason
-    Recommended usage - AutoRecord(s) as class member (composition), AutoDb as singleton/container (one per connection instance) globally available
+    Recommended usage - AutoRecord(s) as class member (composition), AutoDb (one per connection instance) as singleton or in any container globally available
     One Database, one Table two calls for Primary key -> use the same AutoDb instance and you will never have a duplicated AutoRecord instance
     Redis is an optional dependency for caching table describes.
     If using more AutoDb (more tables or more connections) with Redis table definition caching, you WANT to set different $ident for AutoDb::init()
