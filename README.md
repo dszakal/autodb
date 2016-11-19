@@ -1,6 +1,4 @@
-# autodb
-
-UNTESTED, please test before using
+# Autodb
 
 A very simple automated single table read-write Active Record Pattern implementation.
 
@@ -16,7 +14,6 @@ LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
     For now, supports only databases with auto_increment positive integer primary keys (planned to work with unique keys too)
     For now, we do not support editing of primary keys, but you should do that manually and carefully anyway
     For now, type checking is very basic, will improve
-    For now, uses php stock Exception class, will create an own one
 
 Usage example:
 
@@ -47,11 +44,18 @@ Usage example:
     $x->attr('username', 'changedAgain');
     echo $x->attr('username'); // 'changedAgain'
     echo $x->dbAttr('username'); // 'changedPreviously' - from instance
-    echo $x->dbAttrForce('username'); 'changedPreviously' - from database
+    echo $x->dbAttrForce('username'); // 'changedPreviously' - from database
     $x->save(); // now all will be 'changedAgain'
     
     // AutoDb also supports Read only, Write once and blocked tables:
     $autoDb->addBannedTable('sensitive_table');
     $autoDb->addWriteOnceTable('my_strict_log');
     $autoDb->addReadOnlyTable('categories');
+    
+    // You can insert more new rows with one array using 
+    AutoRecord::saveMore($arrayOfSameTableAutorecords);
+    // This line will also update one by one the lines already having a primary key
+    
+    // You can also delete in one single query multiple lines
+    AutoRecord::deleteMore($arrayOfSameTableAutorecords);
 ```
