@@ -2,7 +2,7 @@
 
 namespace AutoDb;
 use mysqli;
-use Exception;
+use AutoDb\AutoDbException;
 use Redis;
 
 class AutoDb {
@@ -48,11 +48,11 @@ class AutoDb {
      * @param type $redisInstance - optional, but instance of Redis if set
      * @param type $connectionIdent - if there are more connections/databases (== more AutoDb instances, we want to avoid redis table key clashing on defs
      * @return \AutoDb\AutoDb
-     * @throws Exception
+     * @throws AutoDbException
      */
     public static function init($sqlResource, $redisInstance = null, $connectionIdent = 'default') {
         if (!($sqlResource instanceof mysqli)) {
-            throw new Exception('AutoDB/AutoRecord: Only MySQL functionality is implemented yet');
+            throw new AutoDbException('AutoDB/AutoRecord: Only MySQL functionality is implemented yet');
         }
         return new AutoDb($sqlResource, $redisInstance);
     }
@@ -204,13 +204,13 @@ class AutoDb {
                     $ret[$row['Field']]['nullable'] = $row['Null'];
                     if (@$row['Key'] === 'PRI') {
                         if (isset($ret['__primarykey']) || !strstr($row['Type'], 'int') || !strstr($row['Extra'], 'auto_increment')) {
-                            throw new Exception("AutoDB: Supported table definitions has exactly one auto_increment integer primary key");
+                            throw new AutoDbException("AutoDB: Supported table definitions has exactly one auto_increment integer primary key");
                         }
                         $ret['__primarykey'] = $row['Field'];
                     }
                 }
             } else {
-                throw new Exception("AutoDB: cannot download table definition");
+                throw new AutoDbException("AutoDB: cannot download table definition");
             }
         }
         

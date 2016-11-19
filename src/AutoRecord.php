@@ -2,7 +2,7 @@
 
 namespace AutoDb;
 use mysqli;
-use Exception;
+use AutoDb\AutoDbException;
 use mysqli_result;
 
 class AutoRecord {
@@ -85,7 +85,7 @@ class AutoRecord {
     public static final function loadRow(AutoDb $autoDb, $table, $keyname = null, $value = null) 
     {
         if (isset($autoDb->getBannedTables()[$table])) {
-            throw new Exception("AutoDb/Autorecord: this table is blocked to be used with autorecord");
+            throw new AutoDbException("AutoDb/Autorecord: this table is blocked to be used with autorecord");
         }
         
         $columnRules = $autoDb->getTableDef($table);
@@ -111,7 +111,7 @@ class AutoRecord {
             $row = $result->fetch_assoc();
             $record->initAttrsFromQueryRow($row);
         } else {
-            throw new Exception("AutoDb/Autorecord: error loading record with PKey: " . $sqlGet . " " . $sqlr->error);
+            throw new AutoDbException("AutoDb/Autorecord: error loading record with PKey: " . $sqlGet . " " . $sqlr->error);
         }
         
         $autoDb->_addInstance($record); // so it will return next time the same reference
@@ -130,7 +130,7 @@ class AutoRecord {
     public static final function loadRowsWhere(AutoDb $autoDb, $table, $where, $limit = -1, $page = 1) 
     {
         if (isset($autoDb->getBannedTables()[$table])) {
-            throw new Exception("AutoDb/Autorecord: this table is blocked to be used with autorecord");
+            throw new AutoDbException("AutoDb/Autorecord: this table is blocked to be used with autorecord");
         }
         $columnRules = $autoDb->getTableDef($table);
         $sqlr = $autoDb->getSqlResource();
@@ -166,24 +166,24 @@ class AutoRecord {
      * @param string $column - the column to read/write
      * @param mixed $setValue - optional - one param version is getter, with this param set it's setter
      * @return mixed - the attribute - the one to be saved if you already changed it
-     * @throws Exception
+     * @throws AutoDbException
      */
     public function attr($column, $setValue = null) {
         if ($this->isDeadReference()) {
-            throw new Exception("AutoDb/Autorecord: Trying to work with dead reference");
+            throw new AutoDbException("AutoDb/Autorecord: Trying to work with dead reference");
         }
         // getter mode
         if (func_num_args() == 1) {
             if (array_key_exists($column, $this->_attributes) && array_key_exists($column, $this->_columnRules)) {
                 return $this->_attributes[$column];
             }
-            throw new Exception("AutoDB/AutoRecord Not existing attribute called for $this->_tableName : $column");
+            throw new AutoDbException("AutoDB/AutoRecord Not existing attribute called for $this->_tableName : $column");
         }
         
         //setter mode
         if (array_key_exists($column, $this->_attributes) && array_key_exists($column, $this->_columnRules)) {
             if (!$this->validate($this->_attributes[$column], $setValue)) {
-                 throw new Exception("AutoDB/AutoRecord Invalid Data attribute added for $this->_tableName : $column : $setValue");
+                 throw new AutoDbException("AutoDB/AutoRecord Invalid Data attribute added for $this->_tableName : $column : $setValue");
             }
             if ($this->_attributes[$column] !== $setValue) {
                 $this->_rowChanged[] = $column;
@@ -192,19 +192,19 @@ class AutoRecord {
             $this->_attributes[$column] = $setValue;
             return $setValue; // for consistency return with the escaped value
         }
-        throw new Exception("AutoDB/AutoRecord Not existing attribute called for $this->_tableName : $column");
+        throw new AutoDbException("AutoDB/AutoRecord Not existing attribute called for $this->_tableName : $column");
     }
     
     /**
      * 
      * @param string $column
      * @return mixed - the attribute - the one before save if you already changed it
-     * @throws Exception
+     * @throws AutoDbException
      */
     public function dbAttr($column)
     {
         if ($this->isDeadReference()) {
-            throw new Exception("AutoDb/Autorecord: Trying to work with dead reference");
+            throw new AutoDbException("AutoDb/Autorecord: Trying to work with dead reference");
         }
         if (isset($this->_originals[$column])) {
             return $this->_originals[$column];
@@ -216,12 +216,12 @@ class AutoRecord {
      * 
      * @param string $column
      * @return mixed - the attribute - the one before save if you already changed it, read forced from db
-     * @throws Exception
+     * @throws AutoDbException
      */    
     public function dbAttrForce($column)
     {
         if ($this->isDeadReference()) {
-            throw new Exception("AutoDb/Autorecord: Trying to work with dead reference");
+            throw new AutoDbException("AutoDb/Autorecord: Trying to work with dead reference");
         }
         $sqlr = $this->_sqlResource;
         if ($sqlr instanceof mysqli) {
@@ -231,7 +231,7 @@ class AutoRecord {
             $row = $result->fetch_assoc();
             return $row[$column];
         }
-        throw new Exception ("Autodb/autorecord - Forced column reader: wrong SQL resource instance or non existing row anymore");
+        throw new AutoDbException ("Autodb/autorecord - Forced column reader: wrong SQL resource instance or non existing row anymore");
     }
     
     public function validate($columnName, $value) {
@@ -242,7 +242,7 @@ class AutoRecord {
         if ($this->_sqlResource instanceof mysqli) {
             return mysqli_real_escape_string($value);
         }
-        throw new Exception("AutoDB/AutoRecord: mnot implemented SQL type");
+        throw new AutoDbException("AutoDB/AutoRecord: mnot implemented SQL type");
     }
     
     public function getPrimaryKeyValue()
@@ -257,7 +257,7 @@ class AutoRecord {
                 return (int)$value;
             }
             if (strstr($type, 'dec')) {
-                throw new Exception("AutoDb/Autorecord: decimal safe escape not 9mplemented yet :(");
+                throw new AutoDbException("AutoDb/Autorecord: decimal safe escape not 9mplemented yet :(");
             }
             if (strstr($type, 'float') || strstr($type, 'double' || strstr($type, 'real'))) {
                 return (double)$value;
@@ -275,15 +275,15 @@ class AutoRecord {
      * Save - final - only saves single row
      * 
      * @return void
-     * @throws Exception - in case of any error
+     * @throws AutoDbException - in case of any error
      */
     public final function save()
     {
         if (array_key_exists($this->_tableName, $this->_autoDb->getReadOnlyTables())) {
-            throw new Exception("AutoDb/Autorecord: this table is read only, save is forbidden");
+            throw new AutoDbException("AutoDb/Autorecord: this table is read only, save is forbidden");
         }
         if ($this->isDeadReference()) {
-            throw new Exception("AutoDb/Autorecord: Trying to save dead reference");
+            throw new AutoDbException("AutoDb/Autorecord: Trying to save dead reference");
         }
         if ($this->getPrimaryKeyValue() < 1) {
             // new row, insert
@@ -309,7 +309,7 @@ class AutoRecord {
                 $sql .= "( $colNames ) VALUES ( $values )";
                 
                 if (!$this->_sqlResource->query($sql)) {
-                    throw new Exception("AutoDb/Autorecord: error inserting new record: " . $sql . " " . $this->_sqlResource->error);
+                    throw new AutoDbException("AutoDb/Autorecord: error inserting new record: " . $sql . " " . $this->_sqlResource->error);
                 }
                 $this->_attributes[$this->getPrimaryKey()] = $this->_sqlResource->insert_id;
                 $this->_autoDb->_addInstance($this); // add new object to pool
@@ -318,12 +318,12 @@ class AutoRecord {
                 return;
             }
             
-            throw new Exception("AutoDb/Autorecord: wrong sql resource");
+            throw new AutoDbException("AutoDb/Autorecord: wrong sql resource");
         }
         
         // Existing record, update
         if (array_key_exists($this->_tableName, $this->_autoDb->getWriteOnceTables())) {
-            throw new Exception("AutoDb/Autorecord: this table is write-once, update is forbidden");
+            throw new AutoDbException("AutoDb/Autorecord: this table is write-once, update is forbidden");
         }
         if (empty($this->_rowChanged)) {
             return; // nothing to do, nothing changed
@@ -346,13 +346,13 @@ class AutoRecord {
 
             $sql .= " WHERE $this->_primaryKey = " . (int)$this->attr($this->_primaryKey);
             if (!$this->_sqlResource->query($sql)) {
-                throw new Exception("AutoDb/Autorecord: error inserting new record: " . $sql . " " . $this->_sqlResource->error);
+                throw new AutoDbException("AutoDb/Autorecord: error inserting new record: " . $sql . " " . $this->_sqlResource->error);
             }
             $this->_rowChanged = array();
             $this->_originals = array();
             return;
         }
-        throw new Exception("AutoDb/Autorecord: unknown error when saving"); // never happens
+        throw new AutoDbException("AutoDb/Autorecord: unknown error when saving"); // never happens
     }
     
     public final function delete()
@@ -361,13 +361,13 @@ class AutoRecord {
             $sql = 'DELETE FROM ' . $this->_tableName . ' WHERE ' . $this->_primaryKey . ' = ' 
                 . (int)$this->getPrimaryKeyValue();
             if (!$this->_sqlResource->query($sql)) {
-                throw new Exception('AutoDb/Autorecord: Error deleting row');
+                throw new AutoDbException('AutoDb/Autorecord: Error deleting row');
             }
             
             $this->setDeadReference();
             return;
         }
-        throw new Exception('AutoDb/Autorecord: Unknown error');
+        throw new AutoDbException('AutoDb/Autorecord: Unknown error');
     }
     
     public function setDeadReference()
@@ -388,7 +388,7 @@ class AutoRecord {
      * Saves more rows optimised, but inserted rows' reference dropped(!), as one query runs for insert
      * @param array $arrayOfAutoRecords - same AutoDb, same Connection, same TABLE, no other instances in the array
      * @return void
-     * @throws Exception
+     * @throws AutoDbException
      */
     public static final function saveMore(array $arrayOfAutoRecords)
     {
@@ -402,20 +402,20 @@ class AutoRecord {
         $sqlr = null;
         foreach ($arrayOfAutoRecords as $autoRecord) {
             if (!($autoRecord instanceof AutoRecord)) {
-                throw new Exception('AutoDb/Autorecord: saveMore() should get an array of AutoRecord instances (also from same table)');
+                throw new AutoDbException('AutoDb/Autorecord: saveMore() should get an array of AutoRecord instances (also from same table)');
             }
             if ($tablename === '') {
                 $tablename = $autoRecord->getTableName();
             }
             if ($tablename !== $autoRecord->getTableName()) {
-                throw new Exception('AutoDb/Autorecord: saveMore() should get an array of AutoRecord instances from same table');
+                throw new AutoDbException('AutoDb/Autorecord: saveMore() should get an array of AutoRecord instances from same table');
             }
             if (is_null($autoDb)) {
                 $autoDb = $autoRecord->_autoDb;
                 $sqlr = $autoDb->getSqlResource();
             } else {
                 if ($autoRecord->_autoDb !== $autoDb || $sqlr !== $autoRecord->getSqlResource()) {
-                    throw new Exception('AutoDb/Autorecord: This was a very dangerous call to the method saveMore(), aborting');
+                    throw new AutoDbException('AutoDb/Autorecord: This was a very dangerous call to the method saveMore(), aborting');
                 }
             }
             
@@ -443,7 +443,7 @@ class AutoRecord {
      * DO NOT USE, helper for saveMore() inserts, making easier to read
      * @param array $toInsert
      * @param type $sqlr
-     * @throws Exception
+     * @throws AutoDbException
      */
     private static final function _saveCheckedArrayOptimised(array $toInsert, $sqlr)
     {
@@ -496,7 +496,7 @@ class AutoRecord {
         }
         if ($sqlr instanceof mysqli) {
             if (!$sqlr->query($insertQuery)) {
-                throw new Exception("AutoDb/Autorecord: saveMore(): error inserting new records: " . $insertQuery . " " . $sqlr->error);
+                throw new AutoDbException("AutoDb/Autorecord: saveMore(): error inserting new records: " . $insertQuery . " " . $sqlr->error);
             }
         }        
     }
@@ -513,21 +513,21 @@ class AutoRecord {
         $toDelete = array();
         foreach ($arrayOfAutoRecords as $autoRecord) {
             if (!($autoRecord instanceof AutoRecord)) {
-                throw new Exception('AutoDb/Autorecord: deleteMore() should get an array of AutoRecord instances (also from same table)');
+                throw new AutoDbException('AutoDb/Autorecord: deleteMore() should get an array of AutoRecord instances (also from same table)');
             }
             if ($tablename === '') {
                 $tablename = $autoRecord->getTableName();
                 $primaryKey = $autoRecord->getPrimaryKey();
             }
             if ($tablename !== $autoRecord->getTableName()) {
-                throw new Exception('AutoDb/Autorecord: deleteMore() should get an array of AutoRecord instances from same table');
+                throw new AutoDbException('AutoDb/Autorecord: deleteMore() should get an array of AutoRecord instances from same table');
             }
             if (is_null($autoDb)) {
                 $autoDb = $autoRecord->_autoDb;
                 $sqlr = $autoDb->getSqlResource();
             } else {
                 if ($autoRecord->_autoDb !== $autoDb || $sqlr !== $autoRecord->getSqlResource()) {
-                    throw new Exception('AutoDb/Autorecord: This was a very dangerous call to the method deleteMore(), aborting');
+                    throw new AutoDbException('AutoDb/Autorecord: This was a very dangerous call to the method deleteMore(), aborting');
                 }
             }
             
@@ -551,11 +551,11 @@ class AutoRecord {
                 . $sqlr->real_escape_string($primaryKey) . ' IN (' . implode(',', $deleteIds) . ')';
 
             if (!$sqlr->query($deleteQuery)) {
-                throw new Exception('AutoDb/Autorecord: deleteMore() failed executing query ' . $deleteQuery . " " . $sqlr->error);
+                throw new AutoDbException('AutoDb/Autorecord: deleteMore() failed executing query ' . $deleteQuery . " " . $sqlr->error);
             }
             return;
         }
-        throw new Exception('AutoDb/Autorecord: deleteMore() - unknown error');
+        throw new AutoDbException('AutoDb/Autorecord: deleteMore() - unknown error');
     }
     
 }
