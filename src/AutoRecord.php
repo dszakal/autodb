@@ -7,6 +7,8 @@ use mysqli_result;
 
 class AutoRecord {
     
+    const DEAD_REFERENCE_PK_VALUE = -1;
+    
     private $_tableName;
     private $_attributes = array();
     
@@ -80,7 +82,7 @@ class AutoRecord {
         }
     }
     
-    public static function loadRow(AutoDb $autoDb, $table, $keyname = null, $value = null) 
+    public static final function loadRow(AutoDb $autoDb, $table, $keyname = null, $value = null) 
     {
         if (isset($autoDb->getBannedTables()[$table])) {
             throw new Exception("AutoDb/Autorecord: this table is blocked to be used with autorecord");
@@ -125,7 +127,7 @@ class AutoRecord {
      * @param int $page
      * @return array
      */
-    public static function loadRowsWhere(AutoDb $autoDb, $table, $where, $limit = -1, $page = 1) 
+    public static final function loadRowsWhere(AutoDb $autoDb, $table, $where, $limit = -1, $page = 1) 
     {
         if (isset($autoDb->getBannedTables()[$table])) {
             throw new Exception("AutoDb/Autorecord: this table is blocked to be used with autorecord");
@@ -159,7 +161,17 @@ class AutoRecord {
         return $ret;
     }
     
+    /**
+     * 
+     * @param string $column - the column to read/write
+     * @param mixed $setValue - optional - one param version is getter, with this param set it's setter
+     * @return mixed - the attribute - the one to be saved if you already changed it
+     * @throws Exception
+     */
     public function attr($column, $setValue = null) {
+        if ($this->isDeadReference()) {
+            throw new Exception("AutoDb/Autorecord: Trying to work with dead reference");
+        }
         // getter mode
         if (func_num_args() == 1) {
             if (array_key_exists($column, $this->_attributes) && array_key_exists($column, $this->_columnRules)) {
@@ -183,16 +195,34 @@ class AutoRecord {
         throw new Exception("AutoDB/AutoRecord Not existing attribute called for $this->_tableName : $column");
     }
     
+    /**
+     * 
+     * @param string $column
+     * @return mixed - the attribute - the one before save if you already changed it
+     * @throws Exception
+     */
     public function dbAttr($column)
     {
+        if ($this->isDeadReference()) {
+            throw new Exception("AutoDb/Autorecord: Trying to work with dead reference");
+        }
         if (isset($this->_originals[$column])) {
             return $this->_originals[$column];
         }
         return $this->attr($column);
     }
     
+    /**
+     * 
+     * @param string $column
+     * @return mixed - the attribute - the one before save if you already changed it, read forced from db
+     * @throws Exception
+     */    
     public function dbAttrForce($column)
     {
+        if ($this->isDeadReference()) {
+            throw new Exception("AutoDb/Autorecord: Trying to work with dead reference");
+        }
         $sqlr = $this->_sqlResource;
         if ($sqlr instanceof mysqli) {
             $sql = 'SELECT ' . $sqlr->real_escape_string($column) . ' FROM ' . $sqlr->real_escape_string($this->_tableName) .
@@ -233,6 +263,9 @@ class AutoRecord {
                 return (double)$value;
             }
             if (strstr($type, 'text') || strstr($type, 'char') || strstr($type, 'date') || strstr($type, 'time')) {
+                if (is_null($value)) {
+                    return 'NULL';
+                }
                 return "'" . $sqlr->real_escape_string($value) . "'";
             }
         }
@@ -240,11 +273,17 @@ class AutoRecord {
     
     /**
      * Save - final - only saves single row
+     * 
+     * @return void
+     * @throws Exception - in case of any error
      */
     public final function save()
     {
         if (array_key_exists($this->_tableName, $this->_autoDb->getReadOnlyTables())) {
             throw new Exception("AutoDb/Autorecord: this table is read only, save is forbidden");
+        }
+        if ($this->isDeadReference()) {
+            throw new Exception("AutoDb/Autorecord: Trying to save dead reference");
         }
         if ($this->getPrimaryKeyValue() < 1) {
             // new row, insert
@@ -313,8 +352,210 @@ class AutoRecord {
             $this->_originals = array();
             return;
         }
+        throw new Exception("AutoDb/Autorecord: unknown error when saving"); // never happens
     }
     
-    // Todo: multi saveMore (static, on array)
+    public final function delete()
+    {
+        if ($this->_sqlResource instanceof mysqli) {
+            $sql = 'DELETE FROM ' . $this->_tableName . ' WHERE ' . $this->_primaryKey . ' = ' 
+                . (int)$this->getPrimaryKeyValue();
+            if (!$this->_sqlResource->query($sql)) {
+                throw new Exception('AutoDb/Autorecord: Error deleting row');
+            }
+            
+            $this->setDeadReference();
+            return;
+        }
+        throw new Exception('AutoDb/Autorecord: Unknown error');
+    }
+    
+    public function setDeadReference()
+    {
+        $primaryKeyWas = $this->getPrimaryKeyValue();
+        $this->attr($this->_primaryKey, self::DEAD_REFERENCE_PK_VALUE);
+        $this->_attributes = array();
+        $this->_originals = array();
+        $this->_autoDb->_removeKey($this->_tableName, $primaryKeyWas);
+    }
+    
+    public function isDeadReference()
+    {
+        return (bool)($this->_primaryKey === self::DEAD_REFERENCE_PK_VALUE);
+    }
+    
+    /**
+     * Saves more rows optimised, but inserted rows' reference dropped(!), as one query runs for insert
+     * @param array $arrayOfAutoRecords - same AutoDb, same Connection, same TABLE, no other instances in the array
+     * @return void
+     * @throws Exception
+     */
+    public static final function saveMore(array $arrayOfAutoRecords)
+    {
+        if (empty($arrayOfAutoRecords)) {
+            return;
+        }
+        $tablename = '';
+        $toUpdate = array();
+        $toInsert = array();
+        $autoDb = null;
+        $sqlr = null;
+        foreach ($arrayOfAutoRecords as $autoRecord) {
+            if (!($autoRecord instanceof AutoRecord)) {
+                throw new Exception('AutoDb/Autorecord: saveMore() should get an array of AutoRecord instances (also from same table)');
+            }
+            if ($tablename === '') {
+                $tablename = $autoRecord->getTableName();
+            }
+            if ($tablename !== $autoRecord->getTableName()) {
+                throw new Exception('AutoDb/Autorecord: saveMore() should get an array of AutoRecord instances from same table');
+            }
+            if (is_null($autoDb)) {
+                $autoDb = $autoRecord->_autoDb;
+                $sqlr = $autoDb->getSqlResource();
+            } else {
+                if ($autoRecord->_autoDb !== $autoDb || $sqlr !== $autoRecord->getSqlResource()) {
+                    throw new Exception('AutoDb/Autorecord: This was a very dangerous call to the method saveMore(), aborting');
+                }
+            }
+            
+            
+            if ($autoRecord->getPrimaryKeyValue() > 0) {
+                $toUpdate[] = $autoRecord;
+            } else {
+                $toInsert[] = $autoRecord;
+            }
+        }
+        
+        foreach ($toUpdate as $autoRecord) {
+            $autoRecord->save(); // cannot be more optimal
+        }
+        
+        if (empty($toInsert)) {
+            return;
+        }
+        
+        // INSERT optimised
+        self::_saveCheckedArrayOptimised($toInsert, $sqlr);
+    }
+    
+    /**
+     * DO NOT USE, helper for saveMore() inserts, making easier to read
+     * @param array $toInsert
+     * @param type $sqlr
+     * @throws Exception
+     */
+    private static final function _saveCheckedArrayOptimised(array $toInsert, $sqlr)
+    {
+        $insertQuery = '';
+        $columns = array(); // to make sure attributes are in order
+        $counter = 0;
+        foreach ($toInsert as $autoRecord) { 
+            if ($sqlr instanceof mysqli) {
+                // set columns if first run
+                if ($insertQuery === '') {
+                    $insertQuery = 'INSERT INTO ' . $sqlr->real_escape_string($autoRecord->getTableName()) . ' ';
+                    
+                    $colNames = '';
+
+                    $comma = false;
+                    foreach ($autoRecord->_columnRules as $key => $rules) {
+                        if ($key === '__primarykey') { // not real column
+                            continue;
+                        }
+                        $columns[] = $key;
+                        if (!$comma) {
+                            $comma = true;
+                        } else {
+                            $colNames .= ',';
+                        }
+                        $colNames .= $sqlr->real_escape_string($key);
+                    }
+                    $insertQuery .= "( $colNames ) VALUES ";
+                }
+                
+                //add values
+                
+            }
+            
+            if ($counter++ >= 1) {
+                $insertQuery .= ','; // new row
+            }
+            
+            $insertQuery .= ' ( ';
+            foreach ($columns as $key => $col) {
+                if ($key > 0) {
+                    $insertQuery .= ' , ';
+                }
+                $insertQuery .= $autoRecord->_getCommasAndEscapes($autoRecord->_columnRules[$col]['type'], $autoRecord->_attributes[$col]);
+            }
+            $insertQuery .= ' ) ';    
+            
+            // we don't know insert ID's, all references are dead :(
+            $autoRecord->setDeadReference();
+        }
+        if ($sqlr instanceof mysqli) {
+            if (!$sqlr->query($insertQuery)) {
+                throw new Exception("AutoDb/Autorecord: saveMore(): error inserting new records: " . $insertQuery . " " . $sqlr->error);
+            }
+        }        
+    }
+    
+    public static final function deleteMore(array $arrayOfAutoRecords)
+    {
+        if (empty($arrayOfAutoRecords)) {
+            return;
+        }
+        $tablename = '';
+        $autoDb = null;
+        $sqlr = null;
+        $primaryKey = null;
+        $toDelete = array();
+        foreach ($arrayOfAutoRecords as $autoRecord) {
+            if (!($autoRecord instanceof AutoRecord)) {
+                throw new Exception('AutoDb/Autorecord: deleteMore() should get an array of AutoRecord instances (also from same table)');
+            }
+            if ($tablename === '') {
+                $tablename = $autoRecord->getTableName();
+                $primaryKey = $autoRecord->getPrimaryKey();
+            }
+            if ($tablename !== $autoRecord->getTableName()) {
+                throw new Exception('AutoDb/Autorecord: deleteMore() should get an array of AutoRecord instances from same table');
+            }
+            if (is_null($autoDb)) {
+                $autoDb = $autoRecord->_autoDb;
+                $sqlr = $autoDb->getSqlResource();
+            } else {
+                if ($autoRecord->_autoDb !== $autoDb || $sqlr !== $autoRecord->getSqlResource()) {
+                    throw new Exception('AutoDb/Autorecord: This was a very dangerous call to the method deleteMore(), aborting');
+                }
+            }
+            
+            
+            if ($autoRecord->getPrimaryKeyValue() > 0) {
+                $toDelete[] = $autoRecord;
+            }
+        }
+        if (empty($toDelete)) {
+            return;
+        }
+        
+        $deleteIds = array();
+        foreach ($toDelete as $autoRecord) {
+            $deleteIds[] = (int)$autoRecord->getPrimaryKeyValue();
+            $autoRecord->setDeadReference();
+        }
+        
+        if ($sqlr instanceof mysqli) {
+            $deleteQuery = 'DELETE FROM ' . $sqlr->real_escape_string($tablename) . ' WHERE '
+                . $sqlr->real_escape_string($primaryKey) . ' IN (' . implode(',', $deleteIds) . ')';
+
+            if (!$sqlr->query($deleteQuery)) {
+                throw new Exception('AutoDb/Autorecord: deleteMore() failed executing query ' . $deleteQuery . " " . $sqlr->error);
+            }
+            return;
+        }
+        throw new Exception('AutoDb/Autorecord: deleteMore() - unknown error');
+    }
     
 }

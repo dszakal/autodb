@@ -41,7 +41,15 @@ class AutoDb {
         $this->_redisInstance = $redisInstance;
         $this->_connectionIdent = $connectionIdent;
     }
-        
+    
+    /**
+     * 
+     * @param mysqli $sqlResource - one MySQL connection <-> One AutoDb instance
+     * @param type $redisInstance - optional, but instance of Redis if set
+     * @param type $connectionIdent - if there are more connections/databases (== more AutoDb instances, we want to avoid redis table key clashing on defs
+     * @return \AutoDb\AutoDb
+     * @throws Exception
+     */
     public static function init($sqlResource, $redisInstance = null, $connectionIdent = 'default') {
         if (!($sqlResource instanceof mysqli)) {
             throw new Exception('AutoDB/AutoRecord: Only MySQL functionality is implemented yet');
@@ -145,6 +153,12 @@ class AutoDb {
     public final function _addInstance(AutoRecord $record)
     {
         $this->_recordInstances[$record->getTableName()][$record->getPrimaryKeyValue()] = $record;
+    }
+    
+    public final function _removeKey($tablename, $primarykey)
+    {
+        $this->_recordInstances[$tablename][$primarykey] = null;
+        unset($this->_recordInstances[$tablename][$primarykey]);
     }
     
     public function getTableDef($tablename) 
