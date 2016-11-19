@@ -54,7 +54,7 @@ Usage example:
     $autoDb->addWriteOnceTable('my_strict_log');
     $autoDb->addReadOnlyTable('categories');
     
-    // You can insert more new rows with one array using 
+    // You can insert more new rows with one single query optimally using 
     AutoRecord::saveMore($arrayOfSameTableAutorecords);
     // This line will also update one by one the lines already having a primary key
     
