@@ -42,8 +42,8 @@ Usage example:
     $rec->save();
     
     // for array of AutoRecord instances with one single query (and returns object cache version if exists)
-    $arrayRecords = $autoDb->rowsArray($table, $where, $limit, $page); // limit default is 100, page defaults to 1 which returns 0-100
-    // this feature is not tested yet, beware
+    $arrayRecords = $autoDb->rowsArray($table, $where, $limit, $page); // limit default is -1 (unlimited results), page defaults to 1
+    // BEWARE - 2nd parameter here is just an UNESCAPED string
     
     // You may also get a previous but unsaved value of an attr you already saved:
     echo $x->attr('username'); // 'changedPreviously'
@@ -57,10 +57,6 @@ Usage example:
     $autoDb->addBannedTable('sensitive_table');
     $autoDb->addWriteOnceTable('my_strict_log');
     $autoDb->addReadOnlyTable('categories');
-    
-    // You can instantiate more AutoRecord rows with one query:
-    $rows = $autoDb->rowsArray('my_table', "'my_column' = 'value'");
-    // BEWARE - 2nd parameter here is just an UNESCAPED string
     
     // You can insert more new rows with one single query optimally using 
     AutoRecord::saveMore($arrayOfSameTableAutorecords);
