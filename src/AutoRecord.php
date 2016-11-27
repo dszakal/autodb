@@ -186,7 +186,10 @@ class AutoRecord {
                  throw new AutoDbException("AutoDB/AutoRecord Invalid Data attribute added for $this->_tableName : $column : $setValue");
             }
             if ($this->_attributes[$column] !== $setValue) {
-                $this->_rowChanged[] = $column;
+                if (!in_array($column, $this->_rowChanged)) {
+                    $this->_rowChanged[] = $column;
+                }
+                
                 $this->_originals[$column] = $this->_attributes[$column];
             }
             $this->_attributes[$column] = $setValue;
@@ -302,7 +305,7 @@ class AutoRecord {
                         $colNames .= ',';
                         $values .= ',';
                     }
-                    $colNames .= $sqlr->real_escape_string($row);
+                    $colNames .= '`' . $sqlr->real_escape_string($row) . '`';
                     $values .= $this->_getCommasAndEscapes($this->_columnRules[$row]['type'], $this->_attributes[$row]);
                 }
                 
@@ -469,7 +472,7 @@ class AutoRecord {
                         } else {
                             $colNames .= ',';
                         }
-                        $colNames .= $sqlr->real_escape_string($key);
+                        $colNames .= '`' . $sqlr->real_escape_string($key) . '`';
                     }
                     $insertQuery .= "( $colNames ) VALUES ";
                 }
