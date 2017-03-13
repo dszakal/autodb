@@ -19,7 +19,7 @@ LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
     For now, supports only databases with auto_increment positive integer primary keys (planned to work with unique keys too)
     For now, we do not support editing of primary keys, but you should do that manually and carefully anyway
     For now, type checking is very basic, will improve
-    For now, no unit tests, will make some as proof that it works. I tested everything though and using it actively.
+    For now, no concurrent writing (INSERT IGNORE INTO, REPLACE INTO), this is the NEXT feature to be implemented
 
 Usage example:
 
@@ -64,4 +64,17 @@ Usage example:
     
     // You can also delete in one single query multiple lines
     AutoRecord::deleteMore($arrayOfSameTableAutorecords);
+```
+
+```
+    <?php
+    // to run unit tests add to project root a file test_mysql_connection_credentials.php as stated in tests/bootstrap.php:
+    
+    // GITIGNORED FILE:
+    <?php
+    
+    define('MYSQL_HOST', 'localhost');
+    define('MYSQL_USER', 'youruser');
+    define('MYSQL_PASSWORD', 'yourpassword');
+    
 ```
