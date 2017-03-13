@@ -107,8 +107,11 @@ class AutoRecord {
             " WHERE " . $sqlr->real_escape_string($keyname) . " = " . (int)$value;
         
         $result = $sqlr->query($sqlGet);
+        $row = array();
         if ($result) {
             $row = $result->fetch_assoc();
+        }
+        if (!empty($row)) {
             $record->initAttrsFromQueryRow($row);
         } else {
             throw new AutoDbException("AutoDb/Autorecord: error loading record with PKey: " . $sqlGet . " " . $sqlr->error);
@@ -260,7 +263,7 @@ class AutoRecord {
                 return (int)$value;
             }
             if (strstr($type, 'dec')) {
-                throw new AutoDbException("AutoDb/Autorecord: decimal safe escape not 9mplemented yet :(");
+                throw new AutoDbException("AutoDb/Autorecord: decimal safe escape not implemented yet :(");
             }
             if (strstr($type, 'float') || strstr($type, 'double' || strstr($type, 'real'))) {
                 return (double)$value;
@@ -268,6 +271,11 @@ class AutoRecord {
             if (strstr($type, 'text') || strstr($type, 'char') || strstr($type, 'date') || strstr($type, 'time')) {
                 if (is_null($value)) {
                     return 'NULL';
+                }
+                if (strstr($type, 'date') || strstr($type, 'time')) {
+                    if ($value === 'NOW()') {
+                        return 'NOW()';
+                    }
                 }
                 return "'" . $sqlr->real_escape_string($value) . "'";
             }
