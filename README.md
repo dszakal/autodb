@@ -94,7 +94,7 @@ CONCURRENT WRITE SUPPORT
     // after a concurrent write reload row by unique key, or you cannot work with it (dead reference):
     $row = $this->testAdb->rowsArray('unik', "uniq_part_1 = 'I_am_first_part_of_unique_key' AND uniq_part_2 = 10")[0]; // array[1] not set as unique
     
-    For more details and limitations on concurrent write see tests/AutoDbTest.php method concurrentWriteTests()
+    // For more details and limitations on concurrent write see tests/AutoDbTest.php method concurrentWriteTests()
 ```
 
 "UNIT" TESTS
