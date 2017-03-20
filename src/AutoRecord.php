@@ -540,11 +540,12 @@ class AutoRecord {
             }
             $insertQuery .= ' ) ';
             
-            $insertQuery .= $suffix; // 'ON DUPLIACTE KEY UPDATE ... '
-            
             // we don't know insert ID's, all references are dead :(
             $autoRecord->setDeadReference();
         }
+        
+        $insertQuery .= $suffix; // 'ON DUPLIACTE KEY UPDATE ... '
+        
         if ($sqlr instanceof mysqli) {
             if (!$sqlr->query($insertQuery)) {
                 throw new AutoDbException("AutoDb/Autorecord: saveMore(): error inserting new records: " . $insertQuery . " " . $sqlr->error);
