@@ -26,7 +26,7 @@ Usage example:
 ```php
     <?php
     // create a new AutoDb instance connecting to your database connection. One mysqli resource <-> One AutoDb
-    $autoDb = AutoDb::init($mysqli, $optionalRedis); 
+    $autoDb = AutoDb::init($mysqli, $optionalRedis, 'optional_database_ident_for_redis_key_table_defs'); 
     // $mysqli is instanceof mysqli right after you connected
     // one $autoDb per connection is recommended, solve it with your own conatainer/singleton for best results
     
