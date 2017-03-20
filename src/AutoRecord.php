@@ -375,7 +375,7 @@ class AutoRecord {
         
         if ($this->_sqlResource instanceof mysqli) {
             $sqlr = $this->_sqlResource;
-            $sql = 'UPDATE ' . $sqlr->real_escape_string($this->getTableName()) . ' SET ';
+            $sql = 'UPDATE `' . $sqlr->real_escape_string($this->getTableName()) . '` SET ';
 
             $comma = false;
             foreach ($this->_rowChanged as $row) {
