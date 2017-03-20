@@ -14,7 +14,7 @@ LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
     Redis is an optional dependency for caching table describes.
     If using more AutoDb (more tables or more connections) with Redis table definition caching, you WANT to set different $ident for AutoDb::init()
     If using Redis cache you WANT to purge 'autodbdefs.*' redis keys in your deploy script, or at least you REALLY WANT TO delete it right after running an ALTER TABLE
-    Concurrent writing (INSERT IGNORE INTO, REPLACE INTO) is supported, but only via AutoRecord::saveMore(array $arrayOfRecords) which will set save inserted/replaced references as dead. For limitations see "unit" tests / concurrentWriteTests()
+    Concurrent writing (INSERT IGNORE INTO, REPLACE INTO) is supported, but only via AutoRecord::saveMore(array $arrayOfRecords) which will set saved inserted/replaced references as dead. For limitations see "unit" tests / concurrentWriteTests()
     We do not support editing of primary keys, but you should do that manually and carefully anyway
     Supports only databases with AUTO_INCREMENT POSITIVE INTEGER primary keys
     Everything by AutoDb or AutoRecord will throw a new instance of AutoDbException in all circumstances
@@ -53,7 +53,8 @@ Usage example:
     echo $x->dbAttrForce('username'); // 'changedPreviously' - from database
     $x->save(); // now all will be 'changedAgain'
     
-    // During save() after INSERT/UPDATE there is no SELECT to populate the columns in the database. You can force it by calling $record->forceReloadAttributes()
+    // During save() after INSERT/UPDATE there is no SELECT to populate the columns in the database. You can force it by calling $record->forceReloadAttributes(). 
+    // (But primary key is up to date always after save(), even without calling $record->forceReloadAttributes() method)
     $row->attr('created_at', 'NOW()');
     $row->save();
     echo $row->attr('created_at');         // 'NOW()' :(
