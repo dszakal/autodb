@@ -319,7 +319,8 @@ class AutoDbTest extends TestCase
             $rows[] = $newrow;
         }
         
-        AutoRecord::saveMore($rows);
+        $changedRows = AutoRecord::saveMore($rows);
+        $this->assertEquals($changedRows, 99);
         
         // fetch latest 5 of in serted 98 + 2 earlier
         $rowsArray = $this->testAdb->rowsArray('clientinfo', 'client_id > 95');
@@ -333,7 +334,8 @@ class AutoDbTest extends TestCase
         $this->assertEquals($row->dbAttr('businessname'), 'mŰltiinsert_96');
         $this->assertEquals($row->dbAttrForce('businessname'), 'mŰltiinsert_96');
         
-        AutoRecord::deleteMore($rowsArray);
+        $deletedRows = AutoRecord::deleteMore($rowsArray);
+        $this->assertEquals($deletedRows, 5);
         $result = $this->mysqli->query('SELECT MAX(client_id) as maxclientid FROM clientinfo');
         $this->assertEquals($result->fetch_assoc()['maxclientid'], 95); // this means deletion done
         
@@ -345,6 +347,10 @@ class AutoDbTest extends TestCase
             $this->exception = true;
         }
         $this->assertTrue($this->exception);
+        
+        // test empty
+        $this->assertEquals(AutoRecord::saveMore(array()),0);
+        $this->assertEquals(AutoRecord::deleteMore(array()),0);
     }
     
 }

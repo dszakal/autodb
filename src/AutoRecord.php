@@ -398,14 +398,17 @@ class AutoRecord {
     /**
      * Saves more rows optimised, but inserted rows' reference dropped(!), as one query runs for insert
      * @param array $arrayOfAutoRecords - same AutoDb, same Connection, same TABLE, no other instances in the array
-     * @return void
+     * @param $insertCommand - INSERT INTO or REPLACE INTO or INSERT IGNORE INTO - for concurrent writes
+     * @param $suffix - for example ' ON DUPLICATE KEY UPDATE last_saved = NOW() '
+     * @return integer - updated rows
      * @throws AutoDbException
      */
-    public static final function saveMore(array $arrayOfAutoRecords)
+    public static final function saveMore(array $arrayOfAutoRecords, $insertCommand = 'INSERT INTO', $suffix = '')
     {
         if (empty($arrayOfAutoRecords)) {
-            return;
+            return 0;
         }
+        $rowCount = 0;
         $tablename = '';
         $toUpdate = array();
         $toInsert = array();
@@ -440,23 +443,25 @@ class AutoRecord {
         
         foreach ($toUpdate as $autoRecord) {
             $autoRecord->save(); // cannot be more optimal
+            ++$rowCount;
         }
         
         if (empty($toInsert)) {
-            return;
+            return $rowCount;
         }
         
-        // INSERT optimised
-        self::_saveCheckedArrayOptimised($toInsert, $sqlr);
+        // INSERT optimised, and return total updated rows
+        return $rowCount + self::_saveCheckedArrayOptimised($toInsert, $sqlr, $insertCommand);
     }
     
     /**
      * DO NOT USE, helper for saveMore() inserts, making easier to read
      * @param array $toInsert
-     * @param type $sqlr
+     * @param mixed $sqlr
+     * @return integer - count of updated rows
      * @throws AutoDbException
      */
-    private static final function _saveCheckedArrayOptimised(array $toInsert, $sqlr)
+    private static final function _saveCheckedArrayOptimised(array $toInsert, $sqlr, $insertCommand)
     {
         $insertQuery = '';
         $columns = array(); // to make sure attributes are in order
@@ -465,7 +470,7 @@ class AutoRecord {
             if ($sqlr instanceof mysqli) {
                 // set columns if first run
                 if ($insertQuery === '') {
-                    $insertQuery = 'INSERT INTO ' . $sqlr->real_escape_string($autoRecord->getTableName()) . ' ';
+                    $insertQuery = $insertCommand . ' ' . $sqlr->real_escape_string($autoRecord->getTableName()) . ' ';
                     
                     $colNames = '';
 
@@ -509,13 +514,21 @@ class AutoRecord {
             if (!$sqlr->query($insertQuery)) {
                 throw new AutoDbException("AutoDb/Autorecord: saveMore(): error inserting new records: " . $insertQuery . " " . $sqlr->error);
             }
-        }        
+            return $sqlr->affected_rows;
+        }
+        return 0;
     }
     
+    /**
+     * 
+     * @param array $arrayOfAutoRecords - same AutoDb, same Connection, same TABLE, no other instances in the array
+     * @return integer - deleted rows
+     * @throws AutoDbException
+     */
     public static final function deleteMore(array $arrayOfAutoRecords)
     {
         if (empty($arrayOfAutoRecords)) {
-            return;
+            return 0;
         }
         $tablename = '';
         $autoDb = null;
@@ -548,7 +561,7 @@ class AutoRecord {
             }
         }
         if (empty($toDelete)) {
-            return;
+            return 0;
         }
         
         $deleteIds = array();
@@ -564,7 +577,7 @@ class AutoRecord {
             if (!$sqlr->query($deleteQuery)) {
                 throw new AutoDbException('AutoDb/Autorecord: deleteMore() failed executing query ' . $deleteQuery . " " . $sqlr->error);
             }
-            return;
+            return $sqlr->affected_rows;
         }
         throw new AutoDbException('AutoDb/Autorecord: deleteMore() - unknown error');
     }
