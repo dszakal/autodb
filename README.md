@@ -92,7 +92,7 @@ CONCURRENT WRITE SUPPORT
     // REPLACE INTO also breaks previous record (by nature of mysql, that primary key value doesn't exist anymore)
     
     // after a concurrent write reload row by unique key, or you cannot work with it (dead reference):
-    $row = $this->testAdb->rowsArray('unik', "uniq_part_1 = 'I_am_first_part_of_unique_key' AND uniq_part_2 = 10")[0]; // array[1] not set as unique
+    $row = MyAppContainer::getAutoDb()->rowsArray('unik', "uniq_part_1 = 'I_am_first_part_of_unique_key' AND uniq_part_2 = 10")[0]; // array[1] not set as unique
     
     // For more details and limitations on concurrent write see tests/AutoDbTest.php method concurrentWriteTests()
 ```
