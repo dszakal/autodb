@@ -54,7 +54,7 @@ class AutoDb {
         if (!($sqlResource instanceof mysqli)) {
             throw new AutoDbException('AutoDB/AutoRecord: Only MySQL functionality is implemented yet');
         }
-        return new AutoDb($sqlResource, $redisInstance);
+        return new AutoDb($sqlResource, $redisInstance, $connectionIdent);
     }
     
     public function getTableDefs() {
