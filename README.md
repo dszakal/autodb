@@ -94,6 +94,8 @@ CONCURRENT WRITE SUPPORT
     For more details and limitations on concurrent write see tests/AutoDbTest.php method concurrentWriteTests()
 ```
 
+"UNIT" TESTS
+
 ```
     <?php
     // to run "unit" tests (rather an Integration test) add to project root a file test_mysql_connection_credentials.php as stated in tests/bootstrap.php:
