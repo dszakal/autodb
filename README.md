@@ -14,11 +14,11 @@ LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
     Redis is an optional dependency for caching table describes.
     If using more AutoDb (more tables or more connections) with Redis table definition caching, you WANT to set different $ident for AutoDb::init()
     If using Redis cache you WANT to purge 'autodbdefs.*' redis keys in your deploy script, or at least you REALLY WANT TO delete it right after running an ALTER TABLE
-    Concurrent writing (INSERT IGNORE INTO, REPLACE INTO) is supported, but only via AutoRecord::saveMore(array $arrayOfRecords) which will set save inserted/replaced references as dead. For limitations see "unit" tests / concurrentWriteTests() 
+    Concurrent writing (INSERT IGNORE INTO, REPLACE INTO) is supported, but only via AutoRecord::saveMore(array $arrayOfRecords) which will set save inserted/replaced references as dead. For limitations see "unit" tests / concurrentWriteTests()
+    We do not support editing of primary keys, but you should do that manually and carefully anyway
+    Supports only databases with AUTO_INCREMENT POSITIVE INTEGER primary keys
     Everything by AutoDb or AutoRecord will throw a new instance of AutoDbException in all circumstances
     For now, supports only MySQL - with mysqli (PDO planned to be supported very soon) - NEXT THING TO BE IMPLEMENTED
-    For now, supports only databases with auto_increment positive integer primary keys
-    We do not support editing of primary keys, but you should do that manually and carefully anyway
     For now, type checking is very basic, will improve
 
 Usage example:
