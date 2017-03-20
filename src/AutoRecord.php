@@ -283,9 +283,41 @@ class AutoRecord {
     }
     
     /**
+     * Reloads all the attributes to match the database 
+     * @throws AutoDbException
+     */
+    public final function forceReloadAttributes()
+    {
+        if ($this->isDeadReference()) {
+            throw new AutoDbException("AutoDb/Autorecord: Trying to reload attributes on dead reference");
+        }
+        if ($this->getPrimaryKeyValue() < 1) {
+            throw new AutoDbException("AutoDb/Autorecord: Trying to reload attributes on unsaved row");
+        }        
+        $sqlr = $this->_sqlResource;
+        $sqlGet = "SELECT * FROM " . $sqlr->real_escape_string($this->getTableName()) . 
+            " WHERE " . $sqlr->real_escape_string($this->getPrimaryKey()) . " = " . (int)$this->getPrimaryKeyValue();
+        
+        $result = $sqlr->query($sqlGet);
+        $row = array();
+        if ($result) {
+            $row = $result->fetch_assoc();
+        }
+        if (!empty($row)) {
+            $this->initAttrsFromQueryRow($row);
+        } else {
+            throw new AutoDbException("AutoDb/Autorecord: error loading record with PKey: " . $sqlGet . " " . $sqlr->error);
+        }
+        $this->_rowChanged = array();
+        $this->_originals = array();
+    }
+    
+    /**
      * Save - final - only saves single row
+     * DOES NOT RELOAD ATTRIBUTES WHICH IS AN EXTRA SELECT use $this->forceReloadAttributes()
+     * For concurrent saves see saveMore()
      * 
-     * @return void
+     * @return integer
      * @throws AutoDbException - in case of any error
      */
     public final function save()
@@ -326,7 +358,7 @@ class AutoRecord {
                 $this->_autoDb->_addInstance($this); // add new object to pool
                 $this->_rowChanged = array();
                 $this->_originals = array();
-                return;
+                return $sqlr->affected_rows;
             }
             
             throw new AutoDbException("AutoDb/Autorecord: wrong sql resource");
@@ -337,7 +369,7 @@ class AutoRecord {
             throw new AutoDbException("AutoDb/Autorecord: this table is write-once, update is forbidden");
         }
         if (empty($this->_rowChanged)) {
-            return; // nothing to do, nothing changed
+            return 0; // nothing to do, nothing changed
         }
         
         if ($this->_sqlResource instanceof mysqli) {
@@ -361,7 +393,7 @@ class AutoRecord {
             }
             $this->_rowChanged = array();
             $this->_originals = array();
-            return;
+            return $sqlr->affected_rows;
         }
         throw new AutoDbException("AutoDb/Autorecord: unknown error when saving"); // never happens
     }
@@ -451,7 +483,7 @@ class AutoRecord {
         }
         
         // INSERT optimised, and return total updated rows
-        return $rowCount + self::_saveCheckedArrayOptimised($toInsert, $sqlr, $insertCommand);
+        return $rowCount + self::_saveCheckedArrayOptimised($toInsert, $sqlr, $insertCommand, $suffix);
     }
     
     /**
@@ -461,7 +493,7 @@ class AutoRecord {
      * @return integer - count of updated rows
      * @throws AutoDbException
      */
-    private static final function _saveCheckedArrayOptimised(array $toInsert, $sqlr, $insertCommand)
+    private static final function _saveCheckedArrayOptimised(array $toInsert, $sqlr, $insertCommand, $suffix)
     {
         $insertQuery = '';
         $columns = array(); // to make sure attributes are in order
@@ -505,7 +537,9 @@ class AutoRecord {
                 }
                 $insertQuery .= $autoRecord->_getCommasAndEscapes($autoRecord->_columnRules[$col]['type'], $autoRecord->_attributes[$col]);
             }
-            $insertQuery .= ' ) ';    
+            $insertQuery .= ' ) ';
+            
+            $insertQuery .= $suffix; // 'ON DUPLIACTE KEY UPDATE ... '
             
             // we don't know insert ID's, all references are dead :(
             $autoRecord->setDeadReference();

@@ -69,6 +69,7 @@ class AutoDbTest extends TestCase
         $this->createTables();
         $this->realTests();
         $this->insertAndUpdateTests();
+        $this->concurrentWriteTests();
     }
     
     private function createTables()
@@ -95,6 +96,23 @@ class AutoDbTest extends TestCase
 
             "
         );
+        
+        $this->mysqli->query(
+            "
+            CREATE TABLE `unik` (
+              `unik_id` int(11) NOT NULL AUTO_INCREMENT,
+              `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              `updated_at` timestamp NULL ON UPDATE CURRENT_TIMESTAMP,
+              `request_count` int(11) NOT NULL DEFAULT 1,
+              `uniq_part_1` VARCHAR(10),
+              `uniq_part_2` INT,
+              `just_a_number` INT DEFAULT 11,
+              PRIMARY KEY (`unik_id`),
+              UNIQUE KEY unik_key (uniq_part_1, uniq_part_2)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+            "
+        );        
         
         // we need a same name different table definition to test things are really working
         $this->mysqliOther->query(
@@ -298,8 +316,11 @@ class AutoDbTest extends TestCase
         $row = $this->testAdbOther->row('clientinfo', 'id_client', 2);
         
         $this->assertEquals($row->attr('isactive'), 0);
+        $row->forceReloadAttributes();
         $row->attr('isactive', 1);
         $this->assertEquals($row->attr('isactive'), 1);
+        // this goes wrong if $row->forceReloadAttributes(); does not run, as (previous) save didn't do select to get default inserted val
+        $this->assertEquals($row->dbAttr('isactive'), 0);
         $this->assertEquals($row->dbAttrForce('isactive'), 0);
         $row->save();
         $this->assertEquals($row->attr('isactive'), 1);
@@ -351,6 +372,83 @@ class AutoDbTest extends TestCase
         // test empty
         $this->assertEquals(AutoRecord::saveMore(array()),0);
         $this->assertEquals(AutoRecord::deleteMore(array()),0);
+    }
+    
+    public function concurrentWriteTests() 
+    {
+        $row1 = $this->testAdb->newRow('unik');
+        $row1->attr('uniq_part_1', 'xxx');
+        $row1->attr('uniq_part_2', 10);
+        $row1->save();
+        $row1->forceReloadAttributes();
+        
+        $row2 = $this->testAdb->newRow('unik');
+        $row2->attr('uniq_part_1', 'xxx');
+        $row2->attr('uniq_part_2', 20);
+        $row2->attr('just_a_number', 21);
+        $row2->save();
+        $row2->forceReloadAttributes();
+        
+        sleep(2);
+        
+        $row3 = $this->testAdb->newRow('unik');
+        $row3->attr('uniq_part_1', 'xxx');
+        $row3->attr('uniq_part_2', 10);
+        
+        $this->exception = false;
+        try {
+            $row3->save();
+        } catch (AutoDbException $e) {
+            $this->exception = true;
+        }
+        $this->assertTrue($this->exception);
+        
+        sleep(2);
+        
+        $row4 = $this->testAdb->newRow('unik');
+        $row4->attr('uniq_part_1', 'xxx');
+        $row4->attr('uniq_part_2', 20);
+        $row4->attr('just_a_number', 42);
+        AutoRecord::saveMore(array($row4), 'REPLACE INTO');
+
+        try {
+            $shouldBeUnavailable = $row4->attr('just_a_number'); // dead reference
+        } catch (AutoDbException $e) {
+            $this->exception = true;
+        }
+        $this->assertTrue($this->exception);
+        
+        $uniqRecord = $this->testAdb->rowsArray('unik', "uniq_part_1 = 'xxx' AND uniq_part_2 = 20")[0];
+        // $row2->forceReloadAttributes(); // replace into changed primary_key, that reference is practically dead, Exception
+        $this->assertEquals($uniqRecord->attr('just_a_number'), 42);
+        
+        $row5 = $this->testAdb->newRow('unik');
+        $row5->attr('uniq_part_1', 'xxx');
+        $row5->attr('uniq_part_2', 30);
+        $row5->attr('just_a_number', 17);
+        $row5->save();
+        $row5->forceReloadAttributes();
+        
+        sleep(2);
+        
+        $row6 = $this->testAdb->newRow('unik');
+        $row6->attr('uniq_part_1', 'xxx');
+        $row6->attr('uniq_part_2', 20);
+        $row6->attr('just_a_number', 44);
+        AutoRecord::saveMore(array($row6), 'INSERT IGNORE INTO');
+        $uniqRecord = $this->testAdb->rowsArray('unik', "uniq_part_1 = 'xxx' AND uniq_part_2 = 30")[0];
+        $row5->forceReloadAttributes();
+        $this->assertEquals($uniqRecord->attr('just_a_number'), 17);
+        
+        $row7 = $this->testAdb->newRow('unik');
+        $row7->attr('uniq_part_1', 'xxx');
+        $row7->attr('uniq_part_2', 10);
+        AutoRecord::saveMore(array($row7), 'INSERT INTO', 'ON DUPLICATE KEY UPDATE request_count = request_count + 1');
+        
+        $this->assertEquals($row1->attr('request_count'), 1);
+        $this->assertEquals($row1->dbAttrForce('request_count'), 2);
+        $row1->forceReloadAttributes();
+        $this->assertEquals($row1->attr('request_count'), 2);
     }
     
 }
