@@ -152,6 +152,7 @@ class AutoRecord {
                 // get from cache if already existing to keep only one instance alive
                 if (isset($autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]])) {
                     $record = $autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]];
+                    $record->initAttrsFromQueryRow($row);
                 } else {
                     $record = new static($autoDb, $table, $columnRules, $sqlr);
                     $record->initAttrsFromQueryRow($row);
