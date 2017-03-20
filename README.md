@@ -77,7 +77,7 @@ Usage example:
 
 CONCURRENT WRITE SUPPORT
 
-```
+```php
     <?php
     $row = $this->testAdb->newRow('unik');
     $row->attr('uniq_part_1', 'I_am_first_part_of_unique_key');
@@ -99,12 +99,11 @@ CONCURRENT WRITE SUPPORT
 
 "UNIT" TESTS
 
-```
+```php
     <?php
     // to run "unit" tests (rather an Integration test) add to project root a file test_mysql_connection_credentials.php as stated in tests/bootstrap.php:
     
     // GITIGNORED FILE:
-    <?php
     
     define('MYSQL_HOST', 'localhost');
     define('MYSQL_USER', 'youruser');
