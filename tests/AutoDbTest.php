@@ -272,6 +272,16 @@ class AutoDbTest extends TestCase
             $this->exception = true;
         }
         $this->assertTrue($this->exception);
+        
+        // new row, not existing column
+        $this->exception = false;
+        try {
+            $row = $this->testAdb->newRow('clientinfo');
+            $row->dbAttrForce('xxx');         
+        } catch (AutoDbException $e) {
+            $this->exception = true;
+        }
+        $this->assertTrue($this->exception);        
     }
     
     public function insertAndUpdateTests()

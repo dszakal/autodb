@@ -235,8 +235,10 @@ class AutoRecord {
             $sql = 'SELECT ' . $sqlr->real_escape_string($column) . ' FROM ' . $sqlr->real_escape_string($this->_tableName) .
             ' WHERE ' . $this->getPrimaryKey() . ' = ' . (int)$this->getPrimaryKeyValue();
             $result = $sqlr->query($sql);
-            $row = $result->fetch_assoc();
-            return $row[$column];
+            if ($result instanceof mysqli_result) {
+                $row = $result->fetch_assoc();
+                return $row[$column];
+            }
         }
         throw new AutoDbException ("Autodb/autorecord - Forced column reader: wrong SQL resource instance or non existing row anymore");
     }
