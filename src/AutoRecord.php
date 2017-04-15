@@ -431,6 +431,19 @@ class AutoRecord {
     }
     
     /**
+     * Not really public, C++ style friend class emulated, practically private
+     * Only working if called from $this->autoDb->replaceMysqliResource
+     * @param mysqli $mysqli
+     */
+    public function _replaceMysqli($mysqli)
+    {
+        if (!$this->_autoDb->getMysqliReplacing()) {
+            throw new AutoDbException('AutoDb/AutoRecord: can only call _replaceMysqli via AutoDb collector');
+        }
+        $this->_sqlResource = $mysqli; // same reference as AutoDb instance
+    }
+    
+    /**
      * Saves more rows optimised, but inserted rows' reference dropped(!), as one query runs for insert
      * @param array $arrayOfAutoRecords - same AutoDb, same Connection, same TABLE, no other instances in the array
      * @param $insertCommand - INSERT INTO or REPLACE INTO or INSERT IGNORE INTO - for concurrent writes

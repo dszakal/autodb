@@ -337,6 +337,23 @@ class AutoDbTest extends TestCase
         $this->assertEquals($row->dbAttr('isactive'), 1);
         $this->assertEquals($row->dbAttrForce('isactive'), 1);
         
+        // reconnect test
+        $this->mysqli->close();
+        $newmysqli = mysqli_connect(MYSQL_HOST, MYSQL_USER, MYSQL_PASSWORD, 'autodb_test');
+        
+        // WRONG WAY test
+        // $row should not be able to reconnect and throw an exception, that is AutoDb object's task
+        $this->exception = false;
+        try {
+            $row->_replaceMysqli($newmysqli);
+        } catch (AutoDbException $e) {
+            $this->exception = true;
+        }
+        $this->assertTrue($this->exception);
+
+        // GOOD WAY test
+        $this->testAdb->replaceMysqliResource($newmysqli); // everything should be still working after reconnect
+        
         $row = $this->testAdb->row('clientinfo', 'client_id', 1);
         $row->attr('username', 'IamUpdated');
         
@@ -349,6 +366,15 @@ class AutoDbTest extends TestCase
             $newrow->attr('passwordhash', 'abdbabcbacbdbadbad12');
             $rows[] = $newrow;
         }
+        
+        // generateInsertQuery() must give us an exception as there are rows to update
+        $this->exception = false;
+        try {
+            AutoRecord::generateInsertQuery($rows);
+        } catch (AutoDbException $e) {
+            $this->exception = true;
+        }
+        $this->assertTrue($this->exception);        
         
         $changedRows = AutoRecord::saveMore($rows);
         $this->assertEquals($changedRows, 99);
@@ -367,7 +393,7 @@ class AutoDbTest extends TestCase
         
         $deletedRows = AutoRecord::deleteMore($rowsArray);
         $this->assertEquals($deletedRows, 5);
-        $result = $this->mysqli->query('SELECT MAX(client_id) as maxclientid FROM clientinfo');
+        $result = $newmysqli->query('SELECT MAX(client_id) as maxclientid FROM clientinfo');
         $this->assertEquals($result->fetch_assoc()['maxclientid'], 95); // this means deletion done
         
         // $row is a dead reference now, is it throwing after deletion?
@@ -382,6 +408,7 @@ class AutoDbTest extends TestCase
         // test empty
         $this->assertEquals(AutoRecord::saveMore(array()),0);
         $this->assertEquals(AutoRecord::deleteMore(array()),0);
+        $this->assertEquals(AutoRecord::generateInsertQuery(array()),''); // empty query string
     }
     
     public function concurrentWriteTests() 

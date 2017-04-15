@@ -73,13 +73,16 @@ Usage example:
     
     // You can also delete in one single query multiple lines
     AutoRecord::deleteMore($arrayOfSameTableAutorecords);
+
+    // if the mysqli resource dies and mysqli->ping() didn't help, you can force replacing it to a new connected mysqli instance
+    $autoDb->replaceMysqliResource($reconnectedMysqli); // will recursively run through autorecords too
 ```
 
 CONCURRENT WRITE SUPPORT
 
 ```php
     <?php
-    $row = $this->testAdb->newRow('unik');
+    $row = MyAppContainer::getAutoDb()->newRow('unik');
     $row->attr('uniq_part_1', 'I_am_first_part_of_unique_key');
     $row->attr('uniq_part_2', 10);
     // $row->save(); // Would throw Exception if Unique key already exists (sometimes you want this though)
@@ -94,6 +97,9 @@ CONCURRENT WRITE SUPPORT
     // after a concurrent write reload row by unique key, or you cannot work with it (dead reference):
     $row = MyAppContainer::getAutoDb()->rowsArray('unik', "uniq_part_1 = 'I_am_first_part_of_unique_key' AND uniq_part_2 = 10")[0]; // array[1] not set as unique
     
+    // you may also want to get the query only the same way (new lines only, lines to update throw exception:
+    AutoRecord::generateInsertQuery(array($row), 'INSERT INTO', 'ON DUPLICATE KEY UPDATE request_count = request_count + 1'); // return INSERT INTO ... string
+
     // For more details and limitations on concurrent write see tests/AutoDbTest.php method concurrentWriteTests()
 ```
 

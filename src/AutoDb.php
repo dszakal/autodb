@@ -28,6 +28,9 @@ class AutoDb {
     private $_readOnlyTables = array();
     private $_writeOnceTables = array(); // No update allowed
     
+    // reconnect mysqli where mysqli->ping() is unavailable or not working
+    private $_mysqliReplacing = false;
+    
     /**
      *
      * @var string - for the redis key
@@ -87,6 +90,10 @@ class AutoDb {
 
     public function getConnectionIdent() {
         return $this->_connectionIdent;
+    }
+    
+    public function getMysqliReplacing() {
+        return $this->_mysqliReplacing;
     }
     
     public function addBannedTable($tablename) {
@@ -215,6 +222,22 @@ class AutoDb {
         }
         
         return $ret;
+    }
+    
+    // mysql specific: replace mysqli connection
+    public function replaceMysqliResource(mysqli $mysqli)
+    {
+        if (!$this->_sqlResource instanceof mysqli) {
+            throw new AutoDbException('AutoDB: not mysqli resource trioed to be reconnected with mysqli');
+        }
+        $this->_sqlResource = $mysqli;
+        $this->_mysqliReplacing = true;
+        foreach ($this->_recordInstances as $recordsArr) {
+            foreach ($recordsArr as $record) {
+                $record->_replaceMysqli($mysqli);
+            }
+        }
+        $this->_mysqliReplacing = false;
     }
     
 }
