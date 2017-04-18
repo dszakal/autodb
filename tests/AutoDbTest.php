@@ -326,7 +326,9 @@ class AutoDbTest extends TestCase
         $row = $this->testAdbOther->row('clientinfo', 'id_client', 2);
         
         $this->assertEquals($row->attr('isactive'), 0);
+        $this->assertEquals($row->getState(), 'saved_not_synced');
         $row->forceReloadAttributes();
+        $this->assertEquals($row->getState(), 'synced');
         $row->attr('isactive', 1);
         $this->assertEquals($row->attr('isactive'), 1);
         // this goes wrong if $row->forceReloadAttributes(); does not run, as (previous) save didn't do select to get default inserted val
@@ -409,6 +411,8 @@ class AutoDbTest extends TestCase
         $this->assertEquals(AutoRecord::saveMore(array()),0);
         $this->assertEquals(AutoRecord::deleteMore(array()),0);
         $this->assertEquals(AutoRecord::generateInsertQuery(array()),''); // empty query string
+        
+        $this->mysqli = $newmysqli; // needed later, hacked lost connection tested already
     }
     
     public function concurrentWriteTests() 
@@ -489,6 +493,21 @@ class AutoDbTest extends TestCase
         $this->assertEquals($row1->dbAttrForce('request_count'), 2);
         $row1->forceReloadAttributes();
         $this->assertEquals($row1->attr('request_count'), 2);
+        
+        // insert more query only test, forcing primary key
+        $rowx = $this->testAdb->newRow('unik');
+        $rowy = $this->testAdb->newRow('unik');
+        
+        $rowx->rapePrimaryKeyForMultiInsertQuery(999);
+        $this->assertEquals($rowx->getState(), 'danger');
+        $this->assertEquals($rowy->getState(), 'new');
+        
+        $query = AutoRecord::generateInsertQuery(array($rowy, $rowx));
+        if (!$this->mysqli->query($query)) {
+            $this->assertEquals(true, false); // should not be here
+        }
+        $result = $this->mysqli->query('SELECT MAX(unik_id) as maxuniqid FROM unik');
+        $this->assertEquals($result->fetch_assoc()['maxuniqid'], 999); // this means forced primary key worked
     }
     
 }

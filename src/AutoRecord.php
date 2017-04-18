@@ -21,6 +21,8 @@ class AutoRecord {
     private $_rowChanged = array();
     private $_originals = array();
     
+    private $state;
+    
     /**
      *
      * @var type AutoDb
@@ -58,6 +60,10 @@ class AutoRecord {
     public function getPrimaryKey() {
         return $this->_primaryKey;
     }
+    
+    public function getState() {
+        return $this->state;
+    }
 
         
     protected function __construct(AutoDb $autoDb, $table, $columnRules, $sqlResource) 
@@ -73,6 +79,7 @@ class AutoRecord {
         foreach ($this->_columnRules as $key => $value) {
             $this->_attributes[$key] = null;
         }
+        $this->state = 'new';
     }
     
     private function initAttrsFromQueryRow(array $row)
@@ -80,6 +87,7 @@ class AutoRecord {
         foreach ($row as $key => $value) {
             $this->_attributes[$key] = $value;
         }
+        $this->state = 'synced';
     }
     
     public static final function loadRow(AutoDb $autoDb, $table, $keyname = null, $value = null) 
@@ -361,6 +369,7 @@ class AutoRecord {
                 $this->_autoDb->_addInstance($this); // add new object to pool
                 $this->_rowChanged = array();
                 $this->_originals = array();
+                $this->state = 'saved_not_synced';
                 return $sqlr->affected_rows;
             }
             
@@ -396,6 +405,7 @@ class AutoRecord {
             }
             $this->_rowChanged = array();
             $this->_originals = array();
+            $this->state = 'saved_not_synced';
             return $sqlr->affected_rows;
         }
         throw new AutoDbException("AutoDb/Autorecord: unknown error when saving"); // never happens
@@ -427,7 +437,18 @@ class AutoRecord {
     
     public function isDeadReference()
     {
-        return (bool)($this->_primaryKey === self::DEAD_REFERENCE_PK_VALUE);
+        return (bool)($this->_primaryKey === self::DEAD_REFERENCE_PK_VALUE || $this->state === 'dead');
+    }
+    
+    /**
+     * Temporary, undocumented and dangerous, using it for a migration script
+     * @param int $key
+     */
+    public function rapePrimaryKeyForMultiInsertQuery($key)
+    {
+        $pk = (int)$key;
+        $this->state = 'danger';
+        $this->_attributes[$this->getPrimaryKey()] = $pk;
     }
     
     /**
@@ -609,7 +630,7 @@ class AutoRecord {
             }
             
             
-            if ($autoRecord->getPrimaryKeyValue() > 0) {
+            if ($autoRecord->getPrimaryKeyValue() > 0 && $autoRecord->getState() !== 'danger') { // forced insert row
                 throw new AutoDbException('AutoDb/Autorecord: generateInsertQuery() should only contain new lines to insert, nothing to update');
             } else {
                 $toInsert[] = $autoRecord;

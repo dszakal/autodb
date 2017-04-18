@@ -2,6 +2,9 @@
 
 A very simple automated single table read-write Active Record Pattern implementation.
 
+Stable: 000.012
+Testing: 000.020
+
 LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
 
     This is not ORM. Just an active record pattern, it doesn't support joins on purpose.
