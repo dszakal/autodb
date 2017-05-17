@@ -267,8 +267,14 @@ class AutoRecord {
         return $this->attr($this->_primaryKey);
     }
     
-    private function _getCommasAndEscapes($type, $value) {
+    private function _getCommasAndEscapes($type, $value, $nullable = false) {
         if ($this->_sqlResource instanceof mysqli) {
+            if (is_null($value) && $nullable) {
+                return 'NULL';
+            }
+            if ($this->_autoDb->getStrictNullableMode() && !$nullable && is_null($value)) {
+                throw new AutoDbException("AutoDb/Autorecord: NULL should not be used here, the col is not nullable :(");
+            }
             $sqlr = $this->_sqlResource;
             if (strstr($type, 'int')) {
                 return (int)$value;
@@ -280,9 +286,6 @@ class AutoRecord {
                 return (double)$value;
             }
             if (strstr($type, 'text') || strstr($type, 'char') || strstr($type, 'date') || strstr($type, 'time')) {
-                if (is_null($value)) {
-                    return 'NULL';
-                }
                 if (strstr($type, 'date') || strstr($type, 'time')) {
                     if ($value === 'NOW()') {
                         return 'NOW()';
@@ -357,7 +360,7 @@ class AutoRecord {
                         $values .= ',';
                     }
                     $colNames .= '`' . $sqlr->real_escape_string($row) . '`';
-                    $values .= $this->_getCommasAndEscapes($this->_columnRules[$row]['type'], $this->_attributes[$row]);
+                    $values .= $this->_getCommasAndEscapes($this->_columnRules[$row]['type'], $this->_attributes[$row], $this->_columnRules[$row]['nullable']);
                 }
                 
                 $sql .= "( $colNames ) VALUES ( $values )";
@@ -396,7 +399,7 @@ class AutoRecord {
                     $sql .= ',';
                 }
                 $sql .= ' ' . $sqlr->real_escape_string($row) . ' = ' . 
-                    $this->_getCommasAndEscapes($this->_columnRules[$row]['type'], $this->_attributes[$row]);
+                    $this->_getCommasAndEscapes($this->_columnRules[$row]['type'], $this->_attributes[$row], $this->_columnRules[$row]['nullable']);
             }
 
             $sql .= " WHERE $this->_primaryKey = " . (int)$this->attr($this->_primaryKey);
@@ -572,7 +575,7 @@ class AutoRecord {
                 if ($key > 0) {
                     $insertQuery .= ' , ';
                 }
-                $insertQuery .= $autoRecord->_getCommasAndEscapes($autoRecord->_columnRules[$col]['type'], $autoRecord->_attributes[$col]);
+                $insertQuery .= $autoRecord->_getCommasAndEscapes($autoRecord->_columnRules[$col]['type'], $autoRecord->_attributes[$col], $autoRecord->_columnRules[$col]['nullable']);
             }
             $insertQuery .= ' ) ';
             
@@ -678,7 +681,7 @@ class AutoRecord {
                 if ($key > 0) {
                     $insertQuery .= ' , ';
                 }
-                $insertQuery .= $autoRecord->_getCommasAndEscapes($autoRecord->_columnRules[$col]['type'], $autoRecord->_attributes[$col]);
+                $insertQuery .= $autoRecord->_getCommasAndEscapes($autoRecord->_columnRules[$col]['type'], $autoRecord->_attributes[$col], $autoRecord->_columnRules[$col]['nullable']);
             }
             $insertQuery .= ' ) ';
             

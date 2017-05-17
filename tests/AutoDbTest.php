@@ -495,7 +495,7 @@ class AutoDbTest extends TestCase
         $row7->attr('uniq_part_2', 10);
         $this->assertEquals(
             AutoRecord::generateInsertQuery(array($row7), 'INSERT INTO', 'ON DUPLICATE KEY UPDATE request_count = request_count + 1'),
-            "INSERT INTO unik ( `unik_id`,`created_at`,`updated_at`,`request_count`,`uniq_part_1`,`uniq_part_2`,`just_a_number` ) VALUES  ( 0 , NULL , NULL , 0 , 'xxx' , 10 , 0 ) ON DUPLICATE KEY UPDATE request_count = request_count + 1");
+            "INSERT INTO unik ( `unik_id`,`created_at`,`updated_at`,`request_count`,`uniq_part_1`,`uniq_part_2`,`just_a_number` ) VALUES  ( 0 , NULL , NULL , NULL , 'xxx' , 10 , NULL ) ON DUPLICATE KEY UPDATE request_count = request_count + 1");
         AutoRecord::saveMore(array($row7), 'INSERT INTO', 'ON DUPLICATE KEY UPDATE request_count = request_count + 1');
         
         $this->assertEquals($row1->attr('request_count'), 1);
