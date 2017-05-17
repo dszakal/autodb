@@ -276,7 +276,7 @@ class AutoRecord {
             if (strstr($type, 'dec')) {
                 throw new AutoDbException("AutoDb/Autorecord: decimal safe escape not implemented yet :(");
             }
-            if (strstr($type, 'float') || strstr($type, 'double' || strstr($type, 'real'))) {
+            if (strstr($type, 'float') || strstr($type, 'double') || strstr($type, 'real')) {
                 return (double)$value;
             }
             if (strstr($type, 'text') || strstr($type, 'char') || strstr($type, 'date') || strstr($type, 'time')) {

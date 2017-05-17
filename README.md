@@ -3,7 +3,8 @@
 A very simple automated single table read-write Active Record Pattern implementation.
 
 Stable: 000.012
-Testing: 000.020
+
+Testing: 000.021
 
 LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
 

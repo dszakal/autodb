@@ -149,6 +149,7 @@ class AutoDbTest extends TestCase
             CREATE TABLE `only_other` (
                 `id_only_other` int(11) NOT NULL AUTO_INCREMENT,
                 `something` text,
+                `else` double DEFAULT NULL,
                 PRIMARY KEY (`id_only_other`)
               ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -297,6 +298,14 @@ class AutoDbTest extends TestCase
         $row2->attr('uname', 'usertester');
         $row2->attr('passhash', 'abdbabcbacbdbadbad12');
         $row2->save();
+        
+        // double test
+        $rowx = $this->testAdbOther->newRow('only_other');
+        $rowx->attr('else', 2.3);
+        $rowx->save();
+        $this->assertEquals($rowx->attr('else'), 2.3);
+        $rowx->forceReloadAttributes();
+        $this->assertEquals($rowx->attr('else'), 2.3);
         
         $logRows = array();
         $logRows[0] = $this->testAdb->newRow('login_log');
