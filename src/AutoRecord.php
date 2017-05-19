@@ -267,25 +267,45 @@ class AutoRecord {
         return $this->attr($this->_primaryKey);
     }
     
-    private function _getCommasAndEscapes($type, $value) {
+    private function _getCommasAndEscapes($col, $value) {
+        $type = $this->_columnRules[$col]['type'];
+        $nullable = $this->_columnRules[$col]['nullable'];
+        $default = $this->_columnRules[$col]['default'];
         if ($this->_sqlResource instanceof mysqli) {
+            if (is_null($value) && $nullable) {
+                return 'NULL';
+            }
+            
+            // From this point it is not nullable so "null" means "default value". You might not like this, use strict mode then
+            if ($this->_autoDb->getStrictNullableMode() && !$nullable && is_null($value)) {
+                throw new AutoDbException("AutoDb/Autorecord: NULL should not be used here, the col is not nullable :(");
+            }
             $sqlr = $this->_sqlResource;
             if (strstr($type, 'int')) {
+                if (is_null($value) && $default != '') {
+                    return (int)$default;
+                }
                 return (int)$value;
             }
             if (strstr($type, 'dec')) {
                 throw new AutoDbException("AutoDb/Autorecord: decimal safe escape not implemented yet :(");
             }
             if (strstr($type, 'float') || strstr($type, 'double') || strstr($type, 'real')) {
+                if (is_null($value) && $default != '') {
+                    return (double)$default;
+                }
                 return (double)$value;
             }
             if (strstr($type, 'text') || strstr($type, 'char') || strstr($type, 'date') || strstr($type, 'time')) {
-                if (is_null($value)) {
-                    return 'NULL';
+                if (is_null($value) && !is_null($default)) {
+                    $value = $default; // for quotes later
                 }
                 if (strstr($type, 'date') || strstr($type, 'time')) {
                     if ($value === 'NOW()') {
                         return 'NOW()';
+                    }
+                    if ($value === 'CURRENT_TIMESTAMP') {
+                        return 'CURRENT_TIMESTAMP';
                     }
                 }
                 return "'" . $sqlr->real_escape_string($value) . "'";
@@ -357,7 +377,7 @@ class AutoRecord {
                         $values .= ',';
                     }
                     $colNames .= '`' . $sqlr->real_escape_string($row) . '`';
-                    $values .= $this->_getCommasAndEscapes($this->_columnRules[$row]['type'], $this->_attributes[$row]);
+                    $values .= $this->_getCommasAndEscapes($row, $this->_attributes[$row]);
                 }
                 
                 $sql .= "( $colNames ) VALUES ( $values )";
@@ -396,7 +416,7 @@ class AutoRecord {
                     $sql .= ',';
                 }
                 $sql .= ' ' . $sqlr->real_escape_string($row) . ' = ' . 
-                    $this->_getCommasAndEscapes($this->_columnRules[$row]['type'], $this->_attributes[$row]);
+                    $this->_getCommasAndEscapes($row, $this->_attributes[$row]);
             }
 
             $sql .= " WHERE $this->_primaryKey = " . (int)$this->attr($this->_primaryKey);
@@ -572,7 +592,7 @@ class AutoRecord {
                 if ($key > 0) {
                     $insertQuery .= ' , ';
                 }
-                $insertQuery .= $autoRecord->_getCommasAndEscapes($autoRecord->_columnRules[$col]['type'], $autoRecord->_attributes[$col]);
+                $insertQuery .= $autoRecord->_getCommasAndEscapes($col, $autoRecord->_attributes[$col]);
             }
             $insertQuery .= ' ) ';
             
@@ -678,7 +698,7 @@ class AutoRecord {
                 if ($key > 0) {
                     $insertQuery .= ' , ';
                 }
-                $insertQuery .= $autoRecord->_getCommasAndEscapes($autoRecord->_columnRules[$col]['type'], $autoRecord->_attributes[$col]);
+                $insertQuery .= $autoRecord->_getCommasAndEscapes($col, $autoRecord->_attributes[$col]);
             }
             $insertQuery .= ' ) ';
             

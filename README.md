@@ -2,9 +2,9 @@
 
 A very simple automated single table read-write Active Record Pattern implementation.
 
-Stable: 000.012
+Old behaviour: 000.012
 
-Testing: 000.021
+Stable: 000.030
 
 LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
 
@@ -80,6 +80,18 @@ Usage example:
 
     // if the mysqli resource dies and mysqli->ping() didn't help, you can force replacing it to a new connected mysqli instance
     $autoDb->replaceMysqliResource($reconnectedMysqli); // will recursively run through autorecords too
+    
+    // EXPERIMENTAL - untested strict "null only if NOT NULL allowed" mode
+    $autoDb->setStrictNullableMode(true);
+    
+    // EXPERIMENTAL - get db dump of array of autorecord rows, (can even force primary key read)
+    foreach ($records as $record) {
+        $pk = $record->getPrimaryKeyValue();
+        $record->rapePrimaryKeyForMultiInsertQuery($pk);
+    }
+        
+    $sqlDump = AutoRecord::generateInsertQuery($records);
+    // Records above may not be usable afterwards, even if yes, UNTESTED
 ```
 
 CONCURRENT WRITE SUPPORT

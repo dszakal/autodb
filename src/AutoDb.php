@@ -27,6 +27,7 @@ class AutoDb {
     private $_bannedTables = array();
     private $_readOnlyTables = array();
     private $_writeOnceTables = array(); // No update allowed
+    private $_strictNullableMode = false; // default - for compatibility and multinserts' safety (DEFAULT values)
     
     // reconnect mysqli where mysqli->ping() is unavailable or not working
     private $_mysqliReplacing = false;
@@ -94,6 +95,15 @@ class AutoDb {
     
     public function getMysqliReplacing() {
         return $this->_mysqliReplacing;
+    }
+    
+    public function getStrictNullableMode() {
+        return $this->_strictNullableMode;
+    }
+    
+    public function setStrictNullableMode($value) {
+        $this->_strictNullableMode = (bool)$value;
+        return $this;
     }
     
     public function addBannedTable($tablename) {
@@ -208,7 +218,8 @@ class AutoDb {
                 while ($row = $result->fetch_assoc()) {
                     $ret[$row['Field']] = array();
                     $ret[$row['Field']]['type'] = $row['Type'];
-                    $ret[$row['Field']]['nullable'] = $row['Null'];
+                    $ret[$row['Field']]['nullable'] = (bool)($row['Null'] == 'YES');
+                    $ret[$row['Field']]['default'] = $row['Default'];
                     if (@$row['Key'] === 'PRI') {
                         if (isset($ret['__primarykey']) || !strstr($row['Type'], 'int') || !strstr($row['Extra'], 'auto_increment')) {
                             throw new AutoDbException("AutoDB: Supported table definitions has exactly one auto_increment integer primary key");
