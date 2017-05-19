@@ -27,7 +27,7 @@ class AutoDb {
     private $_bannedTables = array();
     private $_readOnlyTables = array();
     private $_writeOnceTables = array(); // No update allowed
-    private $_strictNullableMode = false; // default - for comaptibility and multinserts' safety (DEFAULT values)
+    private $_strictNullableMode = false; // default - for compatibility and multinserts' safety (DEFAULT values)
     
     // reconnect mysqli where mysqli->ping() is unavailable or not working
     private $_mysqliReplacing = false;
