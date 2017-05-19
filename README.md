@@ -4,7 +4,7 @@ A very simple automated single table read-write Active Record Pattern implementa
 
 Old behaviour: 000.012
 
-Testing: 000.030
+Stable: 000.030
 
 LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
 
