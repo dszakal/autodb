@@ -272,7 +272,7 @@ class AutoRecord {
         $nullable = $this->_columnRules[$col]['nullable'];
         $default = $this->_columnRules[$col]['default'];
         if ($this->_sqlResource instanceof mysqli) {
-            if (is_null($value) && $nullable) {
+            if (is_null($value) && $nullable && is_null($default)) {
                 return 'NULL';
             }
             if ($this->_autoDb->getStrictNullableMode() && !$nullable && is_null($value)) {
@@ -295,7 +295,7 @@ class AutoRecord {
                 return (double)$value;
             }
             if (strstr($type, 'text') || strstr($type, 'char') || strstr($type, 'date') || strstr($type, 'time')) {
-                if (is_null($value) && $default != '') {
+                if (is_null($value) && !is_null($default)) {
                     $value = $default; // for quotes later
                 }
                 if (strstr($type, 'date') || strstr($type, 'time')) {
