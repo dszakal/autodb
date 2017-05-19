@@ -495,7 +495,7 @@ class AutoDbTest extends TestCase
         $row7->attr('uniq_part_2', 10);
         $this->assertEquals(
             AutoRecord::generateInsertQuery(array($row7), 'INSERT INTO', 'ON DUPLICATE KEY UPDATE request_count = request_count + 1'),
-            "INSERT INTO unik ( `unik_id`,`created_at`,`updated_at`,`request_count`,`uniq_part_1`,`uniq_part_2`,`just_a_number` ) VALUES  ( 0 , CURRENT_TIMESTAMP , NULL , 1 , 'xxx' , 10 , 11 ) ON DUPLICATE KEY UPDATE request_count = request_count + 1");
+            "INSERT INTO unik ( `unik_id`,`created_at`,`updated_at`,`request_count`,`uniq_part_1`,`uniq_part_2`,`just_a_number` ) VALUES  ( 0 , CURRENT_TIMESTAMP , NULL , 1 , 'xxx' , 10 , NULL ) ON DUPLICATE KEY UPDATE request_count = request_count + 1");
         AutoRecord::saveMore(array($row7), 'INSERT INTO', 'ON DUPLICATE KEY UPDATE request_count = request_count + 1');
         
         $this->assertEquals($row1->attr('request_count'), 1);
@@ -517,6 +517,21 @@ class AutoDbTest extends TestCase
         }
         $result = $this->mysqli->query('SELECT MAX(unik_id) as maxuniqid FROM unik');
         $this->assertEquals($result->fetch_assoc()['maxuniqid'], 999); // this means forced primary key worked
+        
+        $row1000 = $this->testAdb->newRow('unik');
+        $row1000->attr('uniq_part_1', 'dddd');
+        $row1000->attr('uniq_part_2', 1000);
+        // before save
+        $this->assertEquals($row1000->attr('just_a_number'), NULL);
+        $this->assertEquals($row1000->attr('request_count'), NULL);   
+        // after save - did not reread
+        $row1000->save();
+        $this->assertEquals($row1000->attr('just_a_number'), NULL);
+        $this->assertEquals($row1000->attr('request_count'), NULL);
+        // after save and reread
+        $row1000->forceReloadAttributes();
+        $this->assertEquals($row1000->attr('just_a_number'), 11); // VALUES didn't contain column
+        $this->assertEquals($row1000->attr('request_count'), 1); // as not nullable, took the default 1
     }
     
 }

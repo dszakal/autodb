@@ -272,9 +272,11 @@ class AutoRecord {
         $nullable = $this->_columnRules[$col]['nullable'];
         $default = $this->_columnRules[$col]['default'];
         if ($this->_sqlResource instanceof mysqli) {
-            if (is_null($value) && $nullable && is_null($default)) {
+            if (is_null($value) && $nullable) {
                 return 'NULL';
             }
+            
+            // From this point it is not nullable so "null" means "default value". You might not like this, use strict mode then
             if ($this->_autoDb->getStrictNullableMode() && !$nullable && is_null($value)) {
                 throw new AutoDbException("AutoDb/Autorecord: NULL should not be used here, the col is not nullable :(");
             }
