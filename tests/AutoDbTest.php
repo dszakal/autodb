@@ -532,6 +532,20 @@ class AutoDbTest extends TestCase
         $row1000->forceReloadAttributes();
         $this->assertEquals($row1000->attr('just_a_number'), 11); // VALUES didn't contain column
         $this->assertEquals($row1000->attr('request_count'), 1); // as not nullable, took the default 1
+        
+        $row1001 = $this->testAdb->newRow('unik');
+        $row1001->attr('uniq_part_1', 'dddd');
+        $row1001->attr('uniq_part_2', 1001);
+        // before save
+        $this->assertEquals($row1001->attr('just_a_number'), NULL);
+        $this->assertEquals($row1001->attr('request_count'), NULL);   
+        // after save - did not reread
+        AutoRecord::saveMore(array($row1001)); // dead reference, reread
+        
+        $reReadRow1001 = $this->testAdb->row('unik', 'unik_id', 1001);
+        $this->assertEquals($reReadRow1001->attr('just_a_number'), NULL); // VALUES did contain column - forced NULL instead of DEFAULT 
+        //(multiinsert can't skip cols)
+        $this->assertEquals($reReadRow1001->attr('request_count'), 1); // as not nullable, took the default 1     
     }
     
 }
