@@ -218,7 +218,7 @@ class AutoDb {
                 while ($row = $result->fetch_assoc()) {
                     $ret[$row['Field']] = array();
                     $ret[$row['Field']]['type'] = $row['Type'];
-                    $ret[$row['Field']]['nullable'] = (bool)($row['Null'] == 'YES' || $row['Default'] != '');
+                    $ret[$row['Field']]['nullable'] = (bool)($row['Null'] == 'YES');
                     $ret[$row['Field']]['default'] = $row['Default'];
                     if (@$row['Key'] === 'PRI') {
                         if (isset($ret['__primarykey']) || !strstr($row['Type'], 'int') || !strstr($row['Extra'], 'auto_increment')) {
