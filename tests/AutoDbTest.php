@@ -22,9 +22,27 @@ class AutoDbTest extends TestCase
     public $testAdb;
     public $testAdbOther;
     
+    public $pgres;
+    public $pgresConn;
+    public $adbpg;
+    
     public $exception;
     
     public $redis;
+    
+    
+    // GITIGNORED FILE - ADD YOUR OWN TO TEST YOURSELF. SAMPLE:
+    /*
+        define('MYSQL_HOST', 'localhost');
+        define('MYSQL_USER', 'youruser');
+        define('MYSQL_PASSWORD', 'yourpassword');
+        define('TEST_MYSQL', 1);
+
+        define('TEST_PGSQL', 1);
+        define('PGSQL_CONN_STRING', 'host=localhost user=postgres password=mypassword');
+     */    
+    
+    // MYSQL START
     
     /**
      * It's more like an integration test than a unit test.
@@ -34,15 +52,14 @@ class AutoDbTest extends TestCase
     public function testMysql()
     {
         
-        // GITIGNORED FILE - ADD YOUR OWN TO TEST YOURSELF. SAMPLE:
-        /*
-            define('MYSQL_HOST', 'localhost');
-            define('MYSQL_USER', 'youruser');
-            define('MYSQL_PASSWORD', 'yourpassword');
-         */
-        
         // require_once(__DIR__ . '/../test_mysql_connection_credentials.php');
         // moved to bootstrap.php
+        
+        if (!TEST_MYSQL) {
+            echo "Warning - skipping mysql test\n";
+            $this->assertTrue(true);
+            return;
+        }
         
         $this->mysqli = mysqli_connect(MYSQL_HOST, MYSQL_USER, MYSQL_PASSWORD);
         
@@ -547,5 +564,146 @@ class AutoDbTest extends TestCase
         //(multiinsert can't skip cols)
         $this->assertEquals($reReadRow1001->attr('request_count'), 1); // as not nullable, took the default 1     
     }
+    
+    // MYSQL END
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    // POSTGRESQL START
+    
+    public function testPgSql()
+    {
+        if (!TEST_PGSQL) {
+            echo "Warning - skipping pgsql test\n";
+            $this->assertTrue(true);
+            return;
+        }
+        
+        $this->pgresConn = pg_connect(PGSQL_CONN_STRING);
+        
+        pg_query($this->pgresConn, 'DROP DATABASE IF EXISTS adbtst');
+        pg_query($this->pgresConn, 'CREATE DATABASE adbtst');
+        
+        $this->pgres = pg_connect(PGSQL_CONN_STRING . ' dbname=adbtst');
+        
+        $this->adbpg = AutoDb::init($this->pgres, $this->redis, 'pgdb');
+        
+        $this->pCreateTables();
+        $this->pBaseTests();
+        
+        pg_close($this->pgres);
+        pg_close($this->pgresConn);
+        
+    }
+    
+    private function pCreateTables()
+    {
+        pg_query($this->pgres, "CREATE TABLE clientinfo (
+                id_client BIGSERIAL PRIMARY KEY,
+                businessname text,
+                username VARCHAR(100),
+                passwordhash text,
+    			created_at timestamp with time zone NOT NULL DEFAULT NOW(),
+    			modified_at timestamp with time zone DEFAULT NULL,
+    			numx INT NOT NULL DEFAULT 11,
+    			numy INT DEFAULT 3,
+    			numz INT NOT NULL,
+    			type text,
+                active INT DEFAULT 0
+              );");
+        
+        pg_query($this->pgres, "CREATE FUNCTION set_updated_timestamp()
+                  RETURNS TRIGGER
+                  LANGUAGE plpgsql
+                AS $$
+                BEGIN
+                  NEW.modified_at := now();
+                  RETURN NEW;
+                END;
+                $$;
+        ");
+        
+        pg_query($this->pgres, "CREATE TRIGGER test_table_update_timestamp
+  				BEFORE UPDATE ON clientinfo
+  				FOR EACH ROW EXECUTE PROCEDURE set_updated_timestamp();
+        "); 
+        
+        pg_query($this->pgres, "CREATE TABLE unikp (
+                id_unikp BIGSERIAL PRIMARY KEY,
+                created_at timestamp NOT NULL DEFAULT NOW(),
+                request_count int NOT NULL DEFAULT 1,
+                uniq_part_1 VARCHAR(10),
+                uniq_part_2 INT,
+                just_a_number INT DEFAULT 11,
+                UNIQUE (uniq_part_1, uniq_part_2)
+            );            
+        ");
+    }
+    
+    private function pBaseTests()
+    {
+        $row = $this->adbpg->newRow('clientinfo');
+        $row->attr('businessname', 'tester');
+        $row->attr('username', 'usertester');
+        $row->attr('passwordhash', 'abdbabcbacbdbadbad12');
+        $row->attr('numz', '16');
+        $row->save();
+        
+        $rowSame = $this->adbpg->row('clientinfo', 'id_client', 1);
+        
+        $this->assertEquals($rowSame->attr('created_at'), null);
+        
+        $this->assertEquals($rowSame->attr('numy'), NULL); // default 3 saved, but object doesn't know
+        $this->assertEquals($rowSame->dbAttrForce('numy'), 3); // but we can force load col from db
+        
+        $rowSame->forceReloadAttributes();
+        $this->assertEquals($rowSame->attr('numz'), 16);
+        $createdAtUpdated = (bool)((int)$rowSame->attr('created_at') >= 2017);
+        $this->assertTrue($createdAtUpdated);
+        $this->assertNull($row->attr('modified_at'));
+        
+        $rowSame->attr('username', 'ichanged');
+        $rowSame->save();
+        // triggered save - object has no idea
+        $this->assertNull($row->attr('modified_at'));
+        $row->forceReloadAttributes();
+        $modifiedAtUpdated = (bool)((int)$rowSame->attr('modified_at') >= 2017);
+        $this->assertTrue($modifiedAtUpdated);        
+        
+        $row2 = $this->adbpg->newRow('clientinfo');
+        $row2->attr('businessname', 'tester2');
+        $row2->attr('username', 'usertester2');
+        $row2->attr('passwordhash', 'abdbabcbacbdbadbad122');
+        $row2->attr('numz', '16');
+        $row2->save();   
+        
+        $row3 = $this->adbpg->newRow('clientinfo');
+        $row3->attr('businessname', 't3ster');
+        $row3->attr('username', 'us3rte');
+        $row3->attr('passwordhash', 'abdbabcbacbdbadbad123');
+        $row3->attr('numz', '19');
+        $row3->save();          
+        
+        $this->assertEquals($row3->attr('id_client'), 3);
+        
+        $row3->delete();
+        
+        $test = pg_query($this->pgres, 'SELECT count(*) as cnt FROM clientinfo');
+        
+        $this->assertEquals(pg_fetch_assoc($test)['cnt'], 2);
+        
+    }
+    
+    // POSTGRESQL END
     
 }

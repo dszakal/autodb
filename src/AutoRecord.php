@@ -3,6 +3,7 @@
 namespace AutoDb;
 use mysqli;
 use AutoDb\AutoDbException;
+use AutoDb\AutoDb;
 use mysqli_result;
 
 class AutoRecord {
@@ -108,22 +109,43 @@ class AutoRecord {
         // existing row in object cache (ensuring same reference
         if (isset($autoDb->getRecordInstances()[$table][$value])) {
             return $autoDb->getRecordInstances()[$table][$value];
+        }        
+        
+        if ($sqlr instanceof mysqli) {
+            // load object from database query:
+            $sqlGet = "SELECT * FROM " . $sqlr->real_escape_string($table) . 
+                " WHERE " . $sqlr->real_escape_string($keyname) . " = " . (int)$value;
+
+            $result = $sqlr->query($sqlGet);
+            $row = array();
+            if ($result) {
+                $row = $result->fetch_assoc();
+            }
+            if (!empty($row)) {
+                $record->initAttrsFromQueryRow($row);
+            } else {
+                throw new AutoDbException("AutoDb/Autorecord: error loading record with PKey: " . $sqlGet . " " . $sqlr->error);
+            }
         }
         
-        // load object from database query:
-        $sqlGet = "SELECT * FROM " . $sqlr->real_escape_string($table) . 
-            " WHERE " . $sqlr->real_escape_string($keyname) . " = " . (int)$value;
+        if (AutoDb::isPgsqlResource($sqlr)) {
+            $sqlGet = "SELECT * FROM " . pg_escape_string($table) . 
+                " WHERE " . pg_escape_string($keyname) . " = " . (int)$value; 
+            
+            $result = pg_query($sqlr, $sqlGet);
+            
+            if ($result) {
+                $row = pg_fetch_assoc($result);
+            }
+            if (!empty($row)) {
+                $record->initAttrsFromQueryRow($row);
+            } else {
+                throw new AutoDbException("AutoDb/Autorecord: error loading record with PKey: " . $sqlGet . " " . $sqlr->error);
+            }            
+            
+        }
         
-        $result = $sqlr->query($sqlGet);
-        $row = array();
-        if ($result) {
-            $row = $result->fetch_assoc();
-        }
-        if (!empty($row)) {
-            $record->initAttrsFromQueryRow($row);
-        } else {
-            throw new AutoDbException("AutoDb/Autorecord: error loading record with PKey: " . $sqlGet . " " . $sqlr->error);
-        }
+        
         
         $autoDb->_addInstance($record); // so it will return next time the same reference
         return $record;
@@ -147,27 +169,59 @@ class AutoRecord {
         $sqlr = $autoDb->getSqlResource();
         $ret = array();
         
-        $sqlGet = "SELECT * FROM " . $sqlr->real_escape_string($table) . 
-            ' WHERE ' . $where;
-        
-        if ($limit > 0) {
-            $sqlGet .= ' LIMIT ' . (int)($limit * ($page-1)) . ', ' . (int)$limit;
+        if ($sqlr instanceof mysqli) {
+            $sqlGet = "SELECT * FROM " . $sqlr->real_escape_string($table) . 
+                ' WHERE ' . $where;
+
+            if ($limit > 0) {
+                $sqlGet .= ' LIMIT ' . (int)($limit * ($page-1)) . ', ' . (int)$limit;
+            }
+
+            $result = $sqlr->query($sqlGet);
+            if ($result instanceof mysqli_result) {
+                while ($row = $result->fetch_assoc()) {
+                    // get from cache if already existing to keep only one instance alive
+                    if (isset($autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]])) {
+                        $record = $autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]];
+                        $record->initAttrsFromQueryRow($row);
+                    } else {
+                        $record = new static($autoDb, $table, $columnRules, $sqlr);
+                        $record->initAttrsFromQueryRow($row);
+                        $autoDb->_addInstance($record);
+                    }
+                    $ret[] = $record;
+                }
+            } else {
+                throw new AutoDbException("AutoDb/Autorecord: mysql error while loading more: " . $sqlr->error);
+            }
         }
         
-        $result = $sqlr->query($sqlGet);
-        if ($result instanceof mysqli_result) {
-            while ($row = $result->fetch_assoc()) {
-                // get from cache if already existing to keep only one instance alive
-                if (isset($autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]])) {
-                    $record = $autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]];
-                    $record->initAttrsFromQueryRow($row);
-                } else {
-                    $record = new static($autoDb, $table, $columnRules, $sqlr);
-                    $record->initAttrsFromQueryRow($row);
-                    $autoDb->_addInstance($record);
-                }
-                $ret[] = $record;
+        if (AutoDb::isPgsqlResource($sqlr)) {
+            $sqlGet = "SELECT * FROM " . pg_escape_string($table) . 
+                ' WHERE ' . $where;
+            
+            if ($limit > 0) {
+                $sqlGet .= ' LIMIT ' . (int)($limit * ($page-1)) . ', ' . (int)$limit;
             }
+
+            $result = pg_query($sqlr, $sqlGet);
+            if (is_result($result)) {
+                while ($row = pg_fetch_assoc($result)) {
+                    // get from cache if already existing to keep only one instance alive
+                    if (isset($autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]])) {
+                        $record = $autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]];
+                        $record->initAttrsFromQueryRow($row);
+                    } else {
+                        $record = new static($autoDb, $table, $columnRules, $sqlr);
+                        $record->initAttrsFromQueryRow($row);
+                        $autoDb->_addInstance($record);
+                    }
+                    $ret[] = $record;
+                }
+            } else {
+                throw new AutoDbException("AutoDb/Autorecord: postgresql error while loading more: " . pg_last_error($sqlr));
+            }
+            
         }
         
         return $ret;
@@ -248,18 +302,37 @@ class AutoRecord {
                 return $row[$column];
             }
         }
+        
+        if (AutoDb::isPgsqlResource($sqlr)) {
+            $sql = 'SELECT ' . pg_escape_string($column) . ' FROM ' . pg_escape_string($this->_tableName) .
+            ' WHERE ' . $this->getPrimaryKey() . ' = ' . (int)$this->getPrimaryKeyValue();
+            $result = pg_query($sqlr, $sql);
+            if (is_resource($result)) {
+                $row = pg_fetch_assoc($result);
+                return $row[$column];
+            }            
+        }
+        
         throw new AutoDbException ("Autodb/autorecord - Forced column reader: wrong SQL resource instance or non existing row anymore");
     }
     
-    public function validate($columnName, $value) {
+    public function validate($columnName, $value) 
+    {
         return true; // not implemented yet, throws an exception later anyway, just put here to include a lib easier later
     }
     
-    public function escape($value) {
+    public function escape($value) 
+    {
+        
         if ($this->_sqlResource instanceof mysqli) {
             return mysqli_real_escape_string($value);
         }
-        throw new AutoDbException("AutoDB/AutoRecord: mnot implemented SQL type");
+        
+        if (AutoDb::isPgsqlResource($this->_sqlResource)) {
+            return pg_escape_string($value);
+        }
+        
+        throw new AutoDbException("AutoDB/AutoRecord: not implemented SQL type");
     }
     
     public function getPrimaryKeyValue()
@@ -267,51 +340,100 @@ class AutoRecord {
         return $this->attr($this->_primaryKey);
     }
     
-    private function _getCommasAndEscapes($col, $value) {
+    
+    
+    // VALUES PROCESSING
+    
+    private function _getCommasAndEscapes($col, $value) 
+    {
         $type = $this->_columnRules[$col]['type'];
         $nullable = $this->_columnRules[$col]['nullable'];
         $default = $this->_columnRules[$col]['default'];
         if ($this->_sqlResource instanceof mysqli) {
-            if (is_null($value) && $nullable) {
-                return 'NULL';
-            }
-            
-            // From this point it is not nullable so "null" means "default value". You might not like this, use strict mode then
-            if ($this->_autoDb->getStrictNullableMode() && !$nullable && is_null($value)) {
-                throw new AutoDbException("AutoDb/Autorecord: NULL should not be used here, the col is not nullable :(");
-            }
-            $sqlr = $this->_sqlResource;
-            if (strstr($type, 'int')) {
-                if (is_null($value) && $default != '') {
-                    return (int)$default;
-                }
-                return (int)$value;
-            }
-            if (strstr($type, 'dec')) {
-                throw new AutoDbException("AutoDb/Autorecord: decimal safe escape not implemented yet :(");
-            }
-            if (strstr($type, 'float') || strstr($type, 'double') || strstr($type, 'real')) {
-                if (is_null($value) && $default != '') {
-                    return (double)$default;
-                }
-                return (double)$value;
-            }
-            if (strstr($type, 'text') || strstr($type, 'char') || strstr($type, 'date') || strstr($type, 'time')) {
-                if (is_null($value) && !is_null($default)) {
-                    $value = $default; // for quotes later
-                }
-                if (strstr($type, 'date') || strstr($type, 'time')) {
-                    if ($value === 'NOW()') {
-                        return 'NOW()';
-                    }
-                    if ($value === 'CURRENT_TIMESTAMP') {
-                        return 'CURRENT_TIMESTAMP';
-                    }
-                }
-                return "'" . $sqlr->real_escape_string($value) . "'";
-            }
+            return $this->_getCommasAndEscapesMysqli($value, $type, $nullable, $default);
+        }
+        if (AutoDb::isPgsqlResource($this->_sqlResource)) {
+            return $this->_getCommasAndEscapesPostgres($value, $type, $nullable, $default);
         }
     }
+    
+    private function _getCommasAndEscapesMysqli($value, $type, $nullable, $default) 
+    {
+        if (is_null($value) && $nullable) {
+            return 'NULL';
+        }
+
+        // From this point it is not nullable so "null" means "default value". You might not like this, use strict mode then
+        if ($this->_autoDb->getStrictNullableMode() && !$nullable && is_null($value)) {
+            throw new AutoDbException("AutoDb/Autorecord: NULL should not be used here, the col is not nullable :(");
+        }
+        $sqlr = $this->_sqlResource;
+        if (strstr($type, 'int')) {
+            if (is_null($value) && $default != '') {
+                return (int)$default;
+            }
+            return (int)$value;
+        }
+        if (strstr($type, 'dec')) {
+            throw new AutoDbException("AutoDb/Autorecord: decimal safe escape not implemented yet :(");
+        }
+        if (strstr($type, 'float') || strstr($type, 'double') || strstr($type, 'real')) {
+            if (is_null($value) && $default != '') {
+                return (double)$default;
+            }
+            return (double)$value;
+        }
+        if (strstr($type, 'text') || strstr($type, 'char') || strstr($type, 'date') || strstr($type, 'time')) {
+            if (is_null($value) && !is_null($default)) {
+                $value = $default; // for quotes later
+            }
+            if (strstr($type, 'date') || strstr($type, 'time')) {
+                if ($value === 'NOW()') {
+                    return 'NOW()';
+                }
+                if ($value === 'CURRENT_TIMESTAMP') {
+                    return 'CURRENT_TIMESTAMP';
+                }
+            }
+            return "'" . $sqlr->real_escape_string($value) . "'";
+        }        
+    }
+    
+    private function _getCommasAndEscapesPostgres($value, $type, $nullable, $default)
+    {
+        if (is_null($value) && $nullable) {
+            return 'NULL';
+        }
+
+        if (strstr($type, 'int')) {
+            if (is_null($value) && $default != '') {
+                return (int)$default;
+            }
+            return (int)$value;
+        }
+        
+        if (strstr($type, 'float') || strstr($type, 'double') || strstr($type, 'real')) {
+            if (is_null($value) && $default != '') {
+                return (double)$default;
+            }
+            return (double)$value;
+        }
+        
+        if ($default) {
+            return $default; // here it contains the quotes already, :: deleted already
+        }
+        
+        if (strstr($type, 'date') || strstr($type, 'time')) {
+            if ($value === 'NOW()') {
+                return 'NOW()';
+            }
+        }
+        return "'" . $this->escape($value) . "'";
+    }
+    
+    // VALUES PROCESSING END
+    
+    
     
     /**
      * Reloads all the attributes to match the database 
@@ -324,16 +446,31 @@ class AutoRecord {
         }
         if ($this->getPrimaryKeyValue() < 1) {
             throw new AutoDbException("AutoDb/Autorecord: Trying to reload attributes on unsaved row");
-        }        
+        }  
         $sqlr = $this->_sqlResource;
-        $sqlGet = "SELECT * FROM " . $sqlr->real_escape_string($this->getTableName()) . 
-            " WHERE " . $sqlr->real_escape_string($this->getPrimaryKey()) . " = " . (int)$this->getPrimaryKeyValue();
         
-        $result = $sqlr->query($sqlGet);
-        $row = array();
-        if ($result) {
-            $row = $result->fetch_assoc();
+        if ($sqlr instanceof mysqli) {
+            $sqlGet = "SELECT * FROM " . $sqlr->real_escape_string($this->getTableName()) . 
+                " WHERE " . $sqlr->real_escape_string($this->getPrimaryKey()) . " = " . (int)$this->getPrimaryKeyValue();
+
+            $result = $sqlr->query($sqlGet);
+            $row = array();
+            if ($result) {
+                $row = $result->fetch_assoc();
+            }
         }
+        
+        if (AutoDb::isPgsqlResource($sqlr)) {
+            $sqlGet = "SELECT * FROM " . pg_escape_string($this->getTableName()) . 
+                " WHERE " . pg_escape_string($this->getPrimaryKey()) . " = " . (int)$this->getPrimaryKeyValue();
+
+            $result = pg_query($sqlr, $sqlGet);
+            $row = array();
+            if ($result) {
+                $row = pg_fetch_assoc($result);
+            }            
+        }
+        
         if (!empty($row)) {
             $this->initAttrsFromQueryRow($row);
         } else {
@@ -342,6 +479,10 @@ class AutoRecord {
         $this->_rowChanged = array();
         $this->_originals = array();
     }
+    
+    
+    
+    // Save START
     
     /**
      * Save - final - only saves single row
@@ -362,38 +503,19 @@ class AutoRecord {
         if ($this->getPrimaryKeyValue() < 1) {
             // new row, insert
             if ($this->_sqlResource instanceof mysqli) {
-                $sqlr = $this->_sqlResource;
-                $sql = 'INSERT INTO ' . $sqlr->real_escape_string($this->getTableName()). ' ';
-                
-                $colNames = '';
-                $values = '';
-                
-                $comma = false;
-                foreach ($this->_rowChanged as $row) {
-                    if (!$comma) {
-                        $comma = true;
-                    } else {
-                        $colNames .= ',';
-                        $values .= ',';
-                    }
-                    $colNames .= '`' . $sqlr->real_escape_string($row) . '`';
-                    $values .= $this->_getCommasAndEscapes($row, $this->_attributes[$row]);
-                }
-                
-                $sql .= "( $colNames ) VALUES ( $values )";
-                
-                if (!$this->_sqlResource->query($sql)) {
-                    throw new AutoDbException("AutoDb/Autorecord: error inserting new record: " . $sql . " " . $this->_sqlResource->error);
-                }
-                $this->_attributes[$this->getPrimaryKey()] = $this->_sqlResource->insert_id;
-                $this->_autoDb->_addInstance($this); // add new object to pool
-                $this->_rowChanged = array();
-                $this->_originals = array();
-                $this->state = 'saved_not_synced';
-                return $sqlr->affected_rows;
+                $ret = $this->_insertMysqli();
             }
             
-            throw new AutoDbException("AutoDb/Autorecord: wrong sql resource");
+            if (AutoDb::isPgsqlResource($this->_sqlResource)) {
+                $ret = $this->_insertPgSql();
+            }
+            
+            $this->_autoDb->_addInstance($this); // add new object to pool
+            $this->_rowChanged = array();
+            $this->_originals = array();
+            $this->state = 'saved_not_synced';
+            
+            return $ret;
         }
         
         // Existing record, update
@@ -405,31 +527,138 @@ class AutoRecord {
         }
         
         if ($this->_sqlResource instanceof mysqli) {
-            $sqlr = $this->_sqlResource;
-            $sql = 'UPDATE `' . $sqlr->real_escape_string($this->getTableName()) . '` SET ';
-
-            $comma = false;
-            foreach ($this->_rowChanged as $row) {
-                if (!$comma) {
-                    $comma = true;
-                } else {
-                    $sql .= ',';
-                }
-                $sql .= ' ' . $sqlr->real_escape_string($row) . ' = ' . 
-                    $this->_getCommasAndEscapes($row, $this->_attributes[$row]);
-            }
-
-            $sql .= " WHERE $this->_primaryKey = " . (int)$this->attr($this->_primaryKey);
-            if (!$this->_sqlResource->query($sql)) {
-                throw new AutoDbException("AutoDb/Autorecord: error inserting new record: " . $sql . " " . $this->_sqlResource->error);
-            }
-            $this->_rowChanged = array();
-            $this->_originals = array();
-            $this->state = 'saved_not_synced';
-            return $sqlr->affected_rows;
+            return $this->_updateMysqli();
         }
+        
+        if (AutoDb::isPgsqlResource($this->_sqlResource)) {
+            return $this->_updatePgsql();
+        }
+        
         throw new AutoDbException("AutoDb/Autorecord: unknown error when saving"); // never happens
     }
+    
+    private function _insertMysqli()
+    {
+        $sqlr = $this->_sqlResource;
+        $sql = 'INSERT INTO `' . $sqlr->real_escape_string($this->getTableName()). '` ';
+
+        $colNames = '';
+        $values = '';
+
+        $comma = false;
+        foreach ($this->_rowChanged as $row) {
+            if (!$comma) {
+                $comma = true;
+            } else {
+                $colNames .= ',';
+                $values .= ',';
+            }
+            $colNames .= '`' . $sqlr->real_escape_string($row) . '`';
+            $values .= $this->_getCommasAndEscapes($row, $this->_attributes[$row]);
+        }
+
+        $sql .= "( $colNames ) VALUES ( $values )";
+
+        if (!$this->_sqlResource->query($sql)) {
+            throw new AutoDbException("AutoDb/Autorecord: mysqli - error inserting new record: " . $sql . " " . $this->_sqlResource->error);
+        }
+        $this->_attributes[$this->getPrimaryKey()] = $this->_sqlResource->insert_id;
+        return $sqlr->affected_rows;        
+    }    
+    
+    private function _insertPgSql()
+    {
+        $sqlr = $this->_sqlResource;
+        $sql = 'INSERT INTO ' . pg_escape_string($this->getTableName()). ' ';
+
+        $colNames = '';
+        $values = '';
+
+        $comma = false;
+        foreach ($this->_rowChanged as $row) {
+            if (!$comma) {
+                $comma = true;
+            } else {
+                $colNames .= ',';
+                $values .= ',';
+            }
+            $colNames .= pg_escape_string($row);
+            $values .= $this->_getCommasAndEscapes($row, $this->_attributes[$row]);
+        }
+
+        $sql .= "( $colNames ) VALUES ( $values ) RETURNING " . $this->getPrimaryKey();
+
+        $pgReturn = pg_query($sqlr, $sql);
+        if (!is_resource($pgReturn)) {
+            throw new AutoDbException("AutoDb/Autorecord: pgsql - error inserting new record: " . $sql . " " . pg_last_error($sqlr));
+        }
+        
+        $this->_attributes[$this->getPrimaryKey()] = pg_fetch_assoc($pgReturn)[$this->getPrimaryKey()];
+
+        return pg_affected_rows($pgReturn);         
+    }
+    
+    private function _updateMysqli()
+    {
+        $sqlr = $this->_sqlResource;
+        $sql = 'UPDATE `' . $sqlr->real_escape_string($this->getTableName()) . '` SET ';
+
+        $comma = false;
+        foreach ($this->_rowChanged as $row) {
+            if (!$comma) {
+                $comma = true;
+            } else {
+                $sql .= ',';
+            }
+            $sql .= ' ' . $sqlr->real_escape_string($row) . ' = ' . 
+                $this->_getCommasAndEscapes($row, $this->_attributes[$row]);
+        }
+
+        $sql .= " WHERE $this->_primaryKey = " . (int)$this->attr($this->_primaryKey);
+        if (!$this->_sqlResource->query($sql)) {
+            throw new AutoDbException("AutoDb/Autorecord: mysqli - error inserting new record: " . $sql . " " . $this->_sqlResource->error);
+        }
+        $this->_rowChanged = array();
+        $this->_originals = array();
+        $this->state = 'saved_not_synced';
+        return $sqlr->affected_rows;        
+    }
+    
+    private function _updatePgsql()
+    {
+        $sqlr = $this->_sqlResource;
+        $sql = 'UPDATE ' . pg_escape_string($this->getTableName()) . ' SET ';
+
+        $comma = false;
+        foreach ($this->_rowChanged as $row) {
+            if (!$comma) {
+                $comma = true;
+            } else {
+                $sql .= ',';
+            }
+            $sql .= ' ' . pg_escape_string($row) . ' = ' . 
+                $this->_getCommasAndEscapes($row, $this->_attributes[$row]);
+        }
+
+        $sql .= " WHERE $this->_primaryKey = " . (int)$this->attr($this->_primaryKey);
+        $pgResult = pg_query($sqlr, $sql);
+        if (!$pgResult) {
+            throw new AutoDbException("AutoDb/Autorecord: PgSQL - error inserting new record: " . $sql . " " . pg_last_error($sqlr));
+        }
+        $this->_rowChanged = array();
+        $this->_originals = array();
+        $this->state = 'saved_not_synced';        
+        
+        return pg_affected_rows($pgResult); 
+    }
+
+
+    // SAVE END
+    
+    
+    
+    
+    
     
     public final function delete()
     {
@@ -437,12 +666,24 @@ class AutoRecord {
             $sql = 'DELETE FROM ' . $this->_tableName . ' WHERE ' . $this->_primaryKey . ' = ' 
                 . (int)$this->getPrimaryKeyValue();
             if (!$this->_sqlResource->query($sql)) {
-                throw new AutoDbException('AutoDb/Autorecord: Error deleting row');
+                throw new AutoDbException('AutoDb/Autorecord: mysqli - Error deleting row');
             }
             
             $this->setDeadReference();
             return;
         }
+        
+        if (AutoDb::isPgsqlResource($this->_sqlResource)) {
+            $sql = 'DELETE FROM ' . $this->_tableName . ' WHERE ' . $this->_primaryKey . ' = ' 
+                . (int)$this->getPrimaryKeyValue();
+            if (!pg_query($sql)) {
+                throw new AutoDbException('AutoDb/Autorecord: pgsql - Error deleting row');
+            }
+            
+            $this->setDeadReference();
+            return;
+        }        
+        
         throw new AutoDbException('AutoDb/Autorecord: Unknown error');
     }
     
@@ -452,6 +693,7 @@ class AutoRecord {
         $this->attr($this->_primaryKey, self::DEAD_REFERENCE_PK_VALUE);
         $this->_attributes = array();
         $this->_originals = array();
+        $this->state = 'dead';
         $this->_autoDb->_removeKey($this->_tableName, $primaryKeyWas);
     }
     

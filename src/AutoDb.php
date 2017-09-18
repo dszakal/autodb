@@ -55,8 +55,8 @@ class AutoDb {
      * @throws AutoDbException
      */
     public static function init($sqlResource, $redisInstance = null, $connectionIdent = 'default') {
-        if (!($sqlResource instanceof mysqli)) {
-            throw new AutoDbException('AutoDB/AutoRecord: Only MySQL functionality is implemented yet');
+        if (!($sqlResource instanceof mysqli) && !(static::isPgsqlResource($sqlResource))) {
+            throw new AutoDbException('AutoDB/AutoRecord: Only mysqli object and postgresql resource functionality is implemented');
         }
         return new AutoDb($sqlResource, $redisInstance, $connectionIdent);
     }
@@ -228,8 +228,65 @@ class AutoDb {
                     }
                 }
             } else {
-                throw new AutoDbException("AutoDB: cannot download table definition");
+                throw new AutoDbException("AutoDB: MYSQL cannot download table definition");
             }
+        }
+        
+        if (static::isPgsqlResource($this->_sqlResource)) {
+            $query = "SELECT * FROM INFORMATION_SCHEMA.COLUMNS where table_name = '" . pg_escape_string($table) . "';";
+            
+            $res = pg_query($this->_sqlResource, $query);
+            
+            if ($res) {
+                while ($row = pg_fetch_assoc($res)) {
+                    $ret[$row['column_name']] = array();
+                    $ret[$row['column_name']]['type'] = $row['data_type'];
+                    $ret[$row['column_name']]['nullable'] = (bool)($row['is_nullable'] == 'YES');
+                    $default = null;
+                    
+                    // this MONSTER is needed to sort DEFAULT and PRIMARY KEY
+                    if (substr($row['column_default'], 0, 8) != 'nextval(') { // autoincrement is not processed here
+                        if (strpos($row['column_default'], '::text') !== false) {
+                            $default = str_replace('::text', '', $row['column_default']); // 'some_default_value' (WITH TICKS ADDED)
+                        }
+                        if (strpos($row['column_default'], '::') === false) {
+                            $default = $row['column_default']; // for example number
+                        }
+                    } else {
+                        if (isset($ret['__primarykey'])) {
+                            throw new AutoDbException("AutoDB: PGSQL - no support for two nextval sequences");
+                        }
+                        // highly likely we are primary key, but double check:
+                        
+                        $priQuery = "SELECT a.attname, format_type(a.atttypid, a.atttypmod) AS data_type
+                                        FROM   pg_index i
+                                        JOIN   pg_attribute a ON a.attrelid = i.indrelid
+                                                             AND a.attnum = ANY(i.indkey)
+                                        WHERE  i.indrelid = '" . pg_escape_string($table) . "'::regclass
+                                        AND    i.indisprimary;
+                        ";
+                        
+                        $resPri = pg_query($this->_sqlResource, $priQuery);
+                        while ($priRow = pg_fetch_assoc($resPri)) {
+                            if ($priRow['attname'] != $row['column_name'] || !strstr($row['data_type'], 'int') ) {
+                                throw new AutoDbException("AutoDB: PGSQL - no support for more primary keys, non-integer primary keys and nextval on non-primary key");
+                            }
+                            $ret['__primarykey'] = $row['column_name'];
+                        }
+                        
+                    }
+                    // MONSTER END
+                    
+                    $ret[$row['column_name']]['default'] = $default;
+                }
+            } else {
+                throw new AutoDbException("AutoDB: PGSQL cannot download table definition");
+            }
+            
+        }
+        
+        if (!isset($ret['__primarykey'])) {
+            throw new AutoDbException("AutoDB: no auto_increment primary key was found");
         }
         
         return $ret;
@@ -249,6 +306,11 @@ class AutoDb {
             }
         }
         $this->_mysqliReplacing = false;
+    }
+    
+    public static function isPgsqlResource($resource)
+    {
+        return (bool)(is_resource($resource) && get_resource_type($resource) == 'pgsql link');
     }
     
 }
