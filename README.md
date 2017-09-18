@@ -11,7 +11,7 @@ LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
     This is not ORM. Just an active record pattern, it doesn't support joins on purpose.
     One AutoRecord instance = one row in one database's one table
     One AutoDb instance <-> One SQL database connection
-    Static saveMore() and deleteMore() methods will only run on same AutoDb, same mysqli, same table rows, otherwise throwing AutoDbException. (Empty array won't throw)
+    Static saveMore() and deleteMore() methods will only run on same AutoDb, same mysqli/pgsql resource, same table rows, otherwise throwing AutoDbException. (Empty array won't throw)
     Also save(), row(), rowsArray(), newRow(), saveMore() and deleteMore() are final for a reason
     Recommended usage - AutoRecord(s) as class member (composition), AutoDb (one per connection instance) as singleton or in any container globally available
     One Database, one Table two calls for Primary key -> use the same AutoDb instance and you will never have a duplicated AutoRecord instance
