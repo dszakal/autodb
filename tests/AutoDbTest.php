@@ -597,11 +597,12 @@ class AutoDbTest extends TestCase
         $this->pgres = pg_connect(PGSQL_CONN_STRING . ' dbname=adbtst');
         
         $this->adbpg = AutoDb::init($this->pgres, $this->redis, 'pgdb');
+        $this->adbpg->setOnDestructDisconnect(true);
         
         $this->pCreateTables();
         $this->pBaseTests();
         
-        pg_close($this->pgres);
+        // pg_close($this->pgres); // autodb destruct should solve this
         pg_close($this->pgresConn);
         
     }
@@ -702,6 +703,35 @@ class AutoDbTest extends TestCase
         
         $this->assertEquals(pg_fetch_assoc($test)['cnt'], 2);
         
+        $row2->attr('passwordhash', 'changedregewrg');
+        $array = array($row2);
+        
+        for ($i = 0; $i < 5; ++$i) {
+            $row = $this->adbpg->newRow('clientinfo');
+            $row->attr('businessname', 'auto' . $i);
+            $row->attr('username', 'ausertester' . $i);
+            $row->attr('passwordhash', 'abdbabcbacbdbadbad12x' . $i);
+            $row->attr('numz', 100 + $i);
+            $array[] = $row;
+        }
+        
+        $this->assertEquals(AutoRecord::saveMore($array), 6); // total 6 rows should be effected
+        
+        $this->assertEquals($row2->dbAttrForce('passwordhash'), 'changedregewrg'); // saved
+        
+        $rowsArr = $this->adbpg->rowsArray('clientinfo', "businessname LIKE 'auto%'");
+        
+        $this->assertEquals(count($rowsArr), 5);
+        
+        $delRows = array($rowsArr[1], $rowsArr[3]);
+        $this->assertEquals(AutoRecord::deleteMore($delRows), 2);
+        
+        $this->assertTrue($rowsArr[1]->isDeadReference());
+        $this->assertFalse($rowsArr[2]->isDeadReference());
+        
+        $test = pg_query($this->pgres, 'SELECT count(*) as cnt FROM clientinfo');
+        
+        $this->assertEquals(pg_fetch_assoc($test)['cnt'], 5); // was 3, 1 deleted, was 2, added 5, was 7, 2 deleted, so 5
     }
     
     // POSTGRESQL END

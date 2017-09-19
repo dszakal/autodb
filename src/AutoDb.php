@@ -30,7 +30,10 @@ class AutoDb {
     private $_strictNullableMode = false; // default - for compatibility and multinserts' safety (DEFAULT values)
     
     // reconnect mysqli where mysqli->ping() is unavailable or not working
-    private $_mysqliReplacing = false;
+    private $_sqlResReplacing = false;
+    
+    // on destruct we may force disconnect:
+    private $_onDestructDisconnect = false;
     
     /**
      *
@@ -93,8 +96,8 @@ class AutoDb {
         return $this->_connectionIdent;
     }
     
-    public function getMysqliReplacing() {
-        return $this->_mysqliReplacing;
+    public function getSqlResReplacing() {
+        return $this->_sqlResReplacing;
     }
     
     public function getStrictNullableMode() {
@@ -117,6 +120,11 @@ class AutoDb {
     public function addWriteOnceTable($tablename) {
         $this->_writeOnceTables[$tablename] = $tablename;
     }
+    
+    public function setOnDestructDisconnect($bool)
+    {
+        $this->_onDestructDisconnect = (bool)$bool;
+    }    
     
     /**
      * Create a new instance of a later possible row in the database
@@ -299,19 +307,47 @@ class AutoDb {
             throw new AutoDbException('AutoDB: not mysqli resource trioed to be reconnected with mysqli');
         }
         $this->_sqlResource = $mysqli;
-        $this->_mysqliReplacing = true;
+        $this->_sqlResReplacing = true;
         foreach ($this->_recordInstances as $recordsArr) {
             foreach ($recordsArr as $record) {
                 $record->_replaceMysqli($mysqli);
             }
         }
-        $this->_mysqliReplacing = false;
+        $this->_sqlResReplacing = false;
+    }
+    
+    public function replacePgSqlResource($pgSqlRes)
+    {
+        if (!static::isPgsqlResource($pgSqlRes)) {
+            throw new AutoDbException('AutoDB: not pgsql resource trioed to be reconnected with pgsql');
+        }
+        $this->_sqlResource = $pgSqlRes;
+        $this->_sqlResReplacing = true;
+        foreach ($this->_recordInstances as $recordsArr) {
+            foreach ($recordsArr as $record) {
+                $record->_replacePgSql($pgSqlRes);
+            }
+        }
+        $this->_sqlResReplacing = false;        
+        
     }
     
     public static function isPgsqlResource($resource)
     {
         return (bool)(is_resource($resource) && get_resource_type($resource) == 'pgsql link');
     }
+    
+    public function __destruct()
+    {
+        if ($this->_onDestructDisconnect) {
+            if ($this->_sqlResource instanceof mysqli) {
+                $this->_sqlResource->disconnect();
+            }
+            if (static::isPgsqlResource($this->_sqlResource)) {
+                pg_close($this->_sqlResource);
+            }
+        }
+    }    
     
 }
 

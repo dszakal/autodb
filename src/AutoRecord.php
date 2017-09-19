@@ -65,7 +65,6 @@ class AutoRecord {
     public function getState() {
         return $this->state;
     }
-
         
     protected function __construct(AutoDb $autoDb, $table, $columnRules, $sqlResource) 
     {
@@ -205,7 +204,7 @@ class AutoRecord {
             }
 
             $result = pg_query($sqlr, $sqlGet);
-            if (is_result($result)) {
+            if (is_resource($result)) {
                 while ($row = pg_fetch_assoc($result)) {
                     // get from cache if already existing to keep only one instance alive
                     if (isset($autoDb->getRecordInstances()[$table][$row[$columnRules['__primarykey']]])) {
@@ -720,11 +719,24 @@ class AutoRecord {
      */
     public function _replaceMysqli($mysqli)
     {
-        if (!$this->_autoDb->getMysqliReplacing()) {
+        if (!$this->_autoDb->getSqlResReplacing()) {
             throw new AutoDbException('AutoDb/AutoRecord: can only call _replaceMysqli via AutoDb collector');
         }
         $this->_sqlResource = $mysqli; // same reference as AutoDb instance
     }
+
+    /**
+     * Not really public, C++ style friend class emulated, practically private
+     * Only working if called from $this->autoDb->replacePgSqlResource
+     * @param resource $pgSqlRes
+     */    
+    public function _replacePgSql($pgSqlRes)
+    {
+        if (!$this->_autoDb->getSqlResReplacing()) {
+            throw new AutoDbException('AutoDb/AutoRecord: can only call _replacePgSql via AutoDb collector');
+        }
+        $this->_sqlResource = $pgSqlRes; // same reference as AutoDb instance
+    }    
     
     /**
      * Saves more rows optimised, but inserted rows' reference dropped(!), as one query runs for insert
@@ -819,11 +831,37 @@ class AutoRecord {
                         $colNames .= '`' . $sqlr->real_escape_string($key) . '`';
                     }
                     $insertQuery .= "( $colNames ) VALUES ";
-                }
-                
-                //add values
-                
+                }                
             }
+            
+            if (AutoDb::isPgsqlResource($sqlr)) {
+                // set columns if first run
+                if ($insertQuery === '') {
+                    $insertQuery = $insertCommand . ' ' . pg_escape_string($autoRecord->getTableName()) . ' ';
+                    
+                    $colNames = '';
+
+                    $comma = false;
+                    foreach ($autoRecord->_columnRules as $key => $rules) {
+                        if ($key === '__primarykey') { // not real column
+                            continue;
+                        }
+                        // in postgres skip primary key unless forced (for all rows):
+                        if ($key == $autoRecord->getPrimaryKey() && $autoRecord->getPrimaryKeyValue() == 0) {
+                            continue;
+                        }
+                        
+                        $columns[] = $key;
+                        if (!$comma) {
+                            $comma = true;
+                        } else {
+                            $colNames .= ',';
+                        }
+                        $colNames .= pg_escape_string($key);
+                    }
+                    $insertQuery .= "( $colNames ) VALUES ";
+                }                
+            }            
             
             if ($counter++ >= 1) {
                 $insertQuery .= ','; // new row
@@ -834,6 +872,12 @@ class AutoRecord {
                 if ($key > 0) {
                     $insertQuery .= ' , ';
                 }
+                if (AutoDb::isPgsqlResource($sqlr)) {
+                    if ($col == $autoRecord->getPrimaryKey() && $autoRecord->getPrimaryKeyValue() == 0) {
+                        continue; // skipping isntead of nextval seq
+                    }
+                }
+                
                 $insertQuery .= $autoRecord->_getCommasAndEscapes($col, $autoRecord->_attributes[$col]);
             }
             $insertQuery .= ' ) ';
@@ -846,10 +890,20 @@ class AutoRecord {
         
         if ($sqlr instanceof mysqli) {
             if (!$sqlr->query($insertQuery)) {
-                throw new AutoDbException("AutoDb/Autorecord: saveMore(): error inserting new records: " . $insertQuery . " " . $sqlr->error);
+                throw new AutoDbException("AutoDb/Autorecord: saveMore(): MySQL - error inserting new records: " . $insertQuery . " " . $sqlr->error);
             }
             return $sqlr->affected_rows;
         }
+        
+        if (AutoDb::isPgsqlResource($sqlr)) {
+            $pgResult = pg_query($sqlr, $insertQuery);
+            if (!$pgResult) {
+                throw new AutoDbException("AutoDb/Autorecord: saveMore(): PgSQL - error inserting new records: " . $sql . " " . pg_last_error($sqlr));
+            }     
+
+            return pg_affected_rows($pgResult);             
+        }
+        
         return 0;
     }
     
@@ -925,11 +979,32 @@ class AutoRecord {
                         $colNames .= '`' . $sqlr->real_escape_string($key) . '`';
                     }
                     $insertQuery .= "( $colNames ) VALUES ";
-                }
-                
-                //add values
-                
+                }                
             }
+            
+            if (AutoDb::isPgsqlResource($sqlr)) {
+                // set columns if first run
+                if ($insertQuery === '') {
+                    $insertQuery = $insertCommand . ' ' . pg_escape_string($autoRecord->getTableName()) . ' ';
+                    
+                    $colNames = '';
+
+                    $comma = false;
+                    foreach ($autoRecord->_columnRules as $key => $rules) {
+                        if ($key === '__primarykey') { // not real column
+                            continue;
+                        }
+                        $columns[] = $key;
+                        if (!$comma) {
+                            $comma = true;
+                        } else {
+                            $colNames .= ',';
+                        }
+                        $colNames .= pg_escape_string($key);
+                    }
+                    $insertQuery .= "( $colNames ) VALUES ";
+                }                
+            }             
             
             if ($counter++ >= 1) {
                 $insertQuery .= ','; // new row
@@ -1011,6 +1086,19 @@ class AutoRecord {
             }
             return $sqlr->affected_rows;
         }
+        
+        if (AutoDb::isPgsqlResource($sqlr)) {
+            $deleteQuery = 'DELETE FROM ' . pg_escape_string($tablename) . ' WHERE '
+                . pg_escape_string($primaryKey) . ' IN (' . implode(',', $deleteIds) . ')';            
+            
+            $pgResult = pg_query($sqlr, $deleteQuery);
+            if (!$pgResult) {
+                throw new AutoDbException("AutoDb/Autorecord: PgSQL - error inserting new record: " . $sql . " " . pg_last_error($sqlr));
+            }       
+
+            return pg_affected_rows($pgResult);
+        }
+        
         throw new AutoDbException('AutoDb/Autorecord: deleteMore() - unknown error');
     }
     
