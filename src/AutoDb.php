@@ -30,7 +30,10 @@ class AutoDb {
     private $_strictNullableMode = false; // default - for compatibility and multinserts' safety (DEFAULT values)
     
     // reconnect mysqli where mysqli->ping() is unavailable or not working
-    private $_mysqliReplacing = false;
+    private $_sqlResReplacing = false;
+    
+    // on destruct we may force disconnect:
+    private $_onDestructDisconnect = false;
     
     /**
      *
@@ -55,8 +58,8 @@ class AutoDb {
      * @throws AutoDbException
      */
     public static function init($sqlResource, $redisInstance = null, $connectionIdent = 'default') {
-        if (!($sqlResource instanceof mysqli)) {
-            throw new AutoDbException('AutoDB/AutoRecord: Only MySQL functionality is implemented yet');
+        if (!($sqlResource instanceof mysqli) && !(static::isPgsqlResource($sqlResource))) {
+            throw new AutoDbException('AutoDB/AutoRecord: Only mysqli object and postgresql resource functionality is implemented');
         }
         return new AutoDb($sqlResource, $redisInstance, $connectionIdent);
     }
@@ -93,8 +96,8 @@ class AutoDb {
         return $this->_connectionIdent;
     }
     
-    public function getMysqliReplacing() {
-        return $this->_mysqliReplacing;
+    public function getSqlResReplacing() {
+        return $this->_sqlResReplacing;
     }
     
     public function getStrictNullableMode() {
@@ -117,6 +120,11 @@ class AutoDb {
     public function addWriteOnceTable($tablename) {
         $this->_writeOnceTables[$tablename] = $tablename;
     }
+    
+    public function setOnDestructDisconnect($bool)
+    {
+        $this->_onDestructDisconnect = (bool)$bool;
+    }    
     
     /**
      * Create a new instance of a later possible row in the database
@@ -228,8 +236,65 @@ class AutoDb {
                     }
                 }
             } else {
-                throw new AutoDbException("AutoDB: cannot download table definition");
+                throw new AutoDbException("AutoDB: MYSQL cannot download table definition");
             }
+        }
+        
+        if (static::isPgsqlResource($this->_sqlResource)) {
+            $query = "SELECT * FROM INFORMATION_SCHEMA.COLUMNS where table_name = '" . pg_escape_string($table) . "';";
+            
+            $res = pg_query($this->_sqlResource, $query);
+            
+            if ($res) {
+                while ($row = pg_fetch_assoc($res)) {
+                    $ret[$row['column_name']] = array();
+                    $ret[$row['column_name']]['type'] = $row['data_type'];
+                    $ret[$row['column_name']]['nullable'] = (bool)($row['is_nullable'] == 'YES');
+                    $default = null;
+                    
+                    // this MONSTER is needed to sort DEFAULT and PRIMARY KEY
+                    if (substr($row['column_default'], 0, 8) != 'nextval(') { // autoincrement is not processed here
+                        if (strpos($row['column_default'], '::text') !== false) {
+                            $default = str_replace('::text', '', $row['column_default']); // 'some_default_value' (WITH TICKS ADDED)
+                        }
+                        if (strpos($row['column_default'], '::') === false) {
+                            $default = $row['column_default']; // for example number
+                        }
+                    } else {
+                        if (isset($ret['__primarykey'])) {
+                            throw new AutoDbException("AutoDB: PGSQL - no support for two nextval sequences");
+                        }
+                        // highly likely we are primary key, but double check:
+                        
+                        $priQuery = "SELECT a.attname, format_type(a.atttypid, a.atttypmod) AS data_type
+                                        FROM   pg_index i
+                                        JOIN   pg_attribute a ON a.attrelid = i.indrelid
+                                                             AND a.attnum = ANY(i.indkey)
+                                        WHERE  i.indrelid = '" . pg_escape_string($table) . "'::regclass
+                                        AND    i.indisprimary;
+                        ";
+                        
+                        $resPri = pg_query($this->_sqlResource, $priQuery);
+                        while ($priRow = pg_fetch_assoc($resPri)) {
+                            if ($priRow['attname'] != $row['column_name'] || !strstr($row['data_type'], 'int') ) {
+                                throw new AutoDbException("AutoDB: PGSQL - no support for more primary keys, non-integer primary keys and nextval on non-primary key");
+                            }
+                            $ret['__primarykey'] = $row['column_name'];
+                        }
+                        
+                    }
+                    // MONSTER END
+                    
+                    $ret[$row['column_name']]['default'] = $default;
+                }
+            } else {
+                throw new AutoDbException("AutoDB: PGSQL cannot download table definition");
+            }
+            
+        }
+        
+        if (!isset($ret['__primarykey'])) {
+            throw new AutoDbException("AutoDB: no auto_increment primary key was found");
         }
         
         return $ret;
@@ -242,14 +307,47 @@ class AutoDb {
             throw new AutoDbException('AutoDB: not mysqli resource trioed to be reconnected with mysqli');
         }
         $this->_sqlResource = $mysqli;
-        $this->_mysqliReplacing = true;
+        $this->_sqlResReplacing = true;
         foreach ($this->_recordInstances as $recordsArr) {
             foreach ($recordsArr as $record) {
                 $record->_replaceMysqli($mysqli);
             }
         }
-        $this->_mysqliReplacing = false;
+        $this->_sqlResReplacing = false;
     }
+    
+    public function replacePgSqlResource($pgSqlRes)
+    {
+        if (!static::isPgsqlResource($pgSqlRes)) {
+            throw new AutoDbException('AutoDB: not pgsql resource trioed to be reconnected with pgsql');
+        }
+        $this->_sqlResource = $pgSqlRes;
+        $this->_sqlResReplacing = true;
+        foreach ($this->_recordInstances as $recordsArr) {
+            foreach ($recordsArr as $record) {
+                $record->_replacePgSql($pgSqlRes);
+            }
+        }
+        $this->_sqlResReplacing = false;        
+        
+    }
+    
+    public static function isPgsqlResource($resource)
+    {
+        return (bool)(is_resource($resource) && get_resource_type($resource) == 'pgsql link');
+    }
+    
+    public function __destruct()
+    {
+        if ($this->_onDestructDisconnect) {
+            if ($this->_sqlResource instanceof mysqli) {
+                $this->_sqlResource->disconnect();
+            }
+            if (static::isPgsqlResource($this->_sqlResource)) {
+                pg_close($this->_sqlResource);
+            }
+        }
+    }    
     
 }
 

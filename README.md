@@ -2,16 +2,16 @@
 
 A very simple automated single table read-write Active Record Pattern implementation.
 
-Old behaviour: 000.012
+Old Stable: 000.030
 
-Stable: 000.030
+PostgreSQL support (php-pgsql (pg_connect, resource), NOT php-pdo-pgsql) from: 000.040
 
 LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
 
     This is not ORM. Just an active record pattern, it doesn't support joins on purpose.
     One AutoRecord instance = one row in one database's one table
     One AutoDb instance <-> One SQL database connection
-    Static saveMore() and deleteMore() methods will only run on same AutoDb, same mysqli, same table rows, otherwise throwing AutoDbException. (Empty array won't throw)
+    Static saveMore() and deleteMore() methods will only run on same AutoDb, same mysqli/pgsql resource, same table rows, otherwise throwing AutoDbException. (Empty array won't throw)
     Also save(), row(), rowsArray(), newRow(), saveMore() and deleteMore() are final for a reason
     Recommended usage - AutoRecord(s) as class member (composition), AutoDb (one per connection instance) as singleton or in any container globally available
     One Database, one Table two calls for Primary key -> use the same AutoDb instance and you will never have a duplicated AutoRecord instance
@@ -22,7 +22,8 @@ LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
     We do not support editing of primary keys, but you should do that manually and carefully anyway
     Supports only databases with AUTO_INCREMENT POSITIVE INTEGER primary keys
     Everything by AutoDb or AutoRecord will throw a new instance of AutoDbException in all circumstances
-    For now, supports only MySQL - with mysqli (PDO planned to be supported very soon) - NEXT THING TO BE IMPLEMENTED
+    Supports MySQL through mysqli and PostgreSQL through pg_connect + resource
+    PDO is not supported, and is not planned to be supported
     For now, type checking is very basic, will improve
 
 Usage example:
@@ -94,10 +95,23 @@ Usage example:
     // Records above may not be usable afterwards, even if yes, UNTESTED
 ```
 
+```php
+    // POSTGRESQL example:
+
+    $pgResource = pg_connect('host=localhost port=5432 user=myuser password=mypassword dbname=mydb');
+
+    $theOneAndOnlyAutoDbPerDatabase = AutoDb::init($pgResource);
+
+    $row = $theOneAndOnlyAutoDbPerDatabase->row('mytable', 'mytable_id', 71);
+    // all features work the same way as above in the mysql examples:
+```
+
+
 CONCURRENT WRITE SUPPORT
 
 ```php
     <?php
+    // MySQL example:
     $row = MyAppContainer::getAutoDb()->newRow('unik');
     $row->attr('uniq_part_1', 'I_am_first_part_of_unique_key');
     $row->attr('uniq_part_2', 10);
@@ -116,7 +130,10 @@ CONCURRENT WRITE SUPPORT
     // you may also want to get the query only the same way (new lines only, lines to update throw exception:
     AutoRecord::generateInsertQuery(array($row), 'INSERT INTO', 'ON DUPLICATE KEY UPDATE request_count = request_count + 1'); // return INSERT INTO ... string
 
-    // For more details and limitations on concurrent write see tests/AutoDbTest.php method concurrentWriteTests()
+    // For more details and limitations on MySQL concurrent write see tests/AutoDbTest.php method concurrentWriteTests()
+
+    // PostGreSQL example:
+    AutoRecord::saveMore(array($row1, $row2), 'INSERT INTO', '﻿ON CONFLICT (uniq_part_1, uniq_part_2) DO UPDATE SET request_count = mytable.request_count + 1;');
 ```
 
 "UNIT" TESTS
@@ -124,11 +141,17 @@ CONCURRENT WRITE SUPPORT
 ```php
     <?php
     // to run "unit" tests (rather an Integration test) add to project root a file test_mysql_connection_credentials.php as stated in tests/bootstrap.php:
-    
+    // you may decide to run or not run MySQL and/or PostgreSQL based tests based on if that's being installed in your machine
+
     // GITIGNORED FILE:
     
+    define('TEST_MYSQL', 1);
     define('MYSQL_HOST', 'localhost');
     define('MYSQL_USER', 'youruser');
     define('MYSQL_PASSWORD', 'yourpassword');
+
+
+    define('TEST_PGSQL', 1);
+    define('PGSQL_CONN_STRING', 'host=localhost port=5432 user=myuser password=mypassword'); // do not worry about conn db
     
 ```
