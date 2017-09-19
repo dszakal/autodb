@@ -732,6 +732,29 @@ class AutoDbTest extends TestCase
         $test = pg_query($this->pgres, 'SELECT count(*) as cnt FROM clientinfo');
         
         $this->assertEquals(pg_fetch_assoc($test)['cnt'], 5); // was 3, 1 deleted, was 2, added 5, was 7, 2 deleted, so 5
+        
+        $rowRaped = $this->adbpg->newRow('clientinfo');
+        $rowRaped->attr('businessname', 'testerd');
+        $rowRaped->attr('username', 'usertesteqr');
+        $rowRaped->attr('passwordhash', 'abdbabcbacbdbadbqad12');
+        $rowRaped->attr('numz', '16');
+        $rowRaped->rapePrimaryKeyForMultiInsertQuery(-2);
+        
+        $rowRaped2 = $this->adbpg->newRow('clientinfo');
+        $rowRaped2->attr('businessname', 'tawest');
+        $rowRaped2->attr('username', 'useqwrqwrtester');
+        $rowRaped2->attr('passwordhash', 'abdbabcbacebdbadbad12');
+        $rowRaped2->attr('numz', 26);
+        $rowRaped2->rapePrimaryKeyForMultiInsertQuery(-3);
+        
+        $arr = array($rowRaped, $rowRaped2);
+        
+        AutoRecord::saveMore($arr);
+        
+        $test = pg_query($this->pgres, 'SELECT MIN(id_client) as minpk FROM clientinfo');
+        
+        $this->assertEquals(pg_fetch_assoc($test)['minpk'], -3); // raped primary key in multi insert       
+        
     }
     
     // POSTGRESQL END
