@@ -131,6 +131,9 @@ CONCURRENT WRITE SUPPORT
     AutoRecord::generateInsertQuery(array($row), 'INSERT INTO', 'ON DUPLICATE KEY UPDATE request_count = request_count + 1'); // return INSERT INTO ... string
 
     // For more details and limitations on MySQL concurrent write see tests/AutoDbTest.php method concurrentWriteTests()
+
+    // PostGreSQL example:
+    AutoRecord::saveMore(array($row1, $row2), 'INSERT INTO', '﻿ON CONFLICT (uniq_part_1, uniq_part_2) DO UPDATE SET request_count = mytable.request_count + 1;');
 ```
 
 "UNIT" TESTS

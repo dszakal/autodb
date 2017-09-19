@@ -2,6 +2,7 @@
 
 namespace AutoDb;
 use mysqli;
+use Exception;
 use AutoDb\AutoDbException;
 use AutoDb\AutoDb;
 use mysqli_result;
@@ -586,8 +587,11 @@ class AutoRecord {
         }
 
         $sql .= "( $colNames ) VALUES ( $values ) RETURNING " . $this->getPrimaryKey();
-
-        $pgReturn = pg_query($sqlr, $sql);
+        try {
+            $pgReturn = pg_query($sqlr, $sql);
+        } catch (Exception $e) {
+            throw new AutoDbException("AutoDb/Autorecord: pgsql - error inserting new record at query: " . $sql . " " . pg_last_error($sqlr) . ' ' . $e->getMessage());
+        }
         if (!is_resource($pgReturn)) {
             throw new AutoDbException("AutoDb/Autorecord: pgsql - error inserting new record: " . $sql . " " . pg_last_error($sqlr));
         }

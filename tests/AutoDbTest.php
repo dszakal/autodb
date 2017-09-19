@@ -601,6 +601,7 @@ class AutoDbTest extends TestCase
         
         $this->pCreateTables();
         $this->pBaseTests();
+        $this->pConcurrencyTests();
         
         // pg_close($this->pgres); // autodb destruct should solve this
         pg_close($this->pgresConn);
@@ -755,6 +756,48 @@ class AutoDbTest extends TestCase
         
         $this->assertEquals(pg_fetch_assoc($test)['minpk'], -3); // raped primary key in multi insert       
         
+    }
+    
+    public function pConcurrencyTests()
+    {
+        $row1 = $this->adbpg->newRow('unikp');
+        $row1->attr('uniq_part_1', 'xxx');
+        $row1->attr('uniq_part_2', 10);
+        $row1->save();
+        $row1->forceReloadAttributes();
+        
+        $row2 = $this->adbpg->newRow('unikp');
+        $row2->attr('uniq_part_1', 'xxx');
+        $row2->attr('uniq_part_2', 20);
+        $row2->attr('just_a_number', 21);
+        $row2->save();
+        $row2->forceReloadAttributes();
+
+        sleep(2);
+        
+        $row3 = $this->adbpg->newRow('unikp');
+        $row3->attr('uniq_part_1', 'xxx');
+        $row3->attr('uniq_part_2', 10);
+        
+        $this->exception = false;
+        try {
+            $row3->save();
+        } catch (AutoDbException $e) {
+            $this->exception = true;
+        }
+        $this->assertTrue($this->exception);
+
+        $row4 = $this->adbpg->newRow('unikp');
+        $row4->attr('uniq_part_1', 'xxx');
+        $row4->attr('uniq_part_2', 20);
+        $row4->attr('just_a_number', 24);
+        
+        AutoRecord::saveMore(array($row4), 'INSERT INTO', 'ON CONFLICT (uniq_part_1, uniq_part_2) DO UPDATE SET request_count = unikp.request_count + 1;');
+        
+        $row2->forceReloadAttributes();
+        $this->assertEquals($row2->attr('just_a_number'), 21); // was not in "on conflict"
+        $this->assertEquals($row2->attr('request_count'), 2); // 1 + 1 from "ON CONFLICT" clause
+        $this->assertTrue($row4->isDeadReference());
     }
     
     // POSTGRESQL END
