@@ -407,6 +407,10 @@ class AutoDbTest extends TestCase
         $changedRows = AutoRecord::saveMore($rows);
         $this->assertEquals($changedRows, 99);
         
+        // limit and page test
+        $arr = $this->testAdb->rowsArray('clientinfo', '1 = 1', 10, 3);
+        $this->assertEquals(count($arr), 10);
+        
         // fetch latest 5 of in serted 98 + 2 earlier
         $rowsArray = $this->testAdb->rowsArray('clientinfo', 'client_id > 95');
         $this->assertEquals(count($rowsArray), 5);
@@ -647,6 +651,7 @@ class AutoDbTest extends TestCase
                 uniq_part_1 VARCHAR(10),
                 uniq_part_2 INT,
                 just_a_number INT DEFAULT 11,
+                testjson json NOT NULL DEFAULT '{}',
                 UNIQUE (uniq_part_1, uniq_part_2)
             );            
         ");
@@ -717,6 +722,9 @@ class AutoDbTest extends TestCase
         }
         
         $this->assertEquals(AutoRecord::saveMore($array), 6); // total 6 rows should be effected
+        
+        $arr = $this->adbpg->rowsArray('clientinfo', '1 = 1', 3, 2);
+        $this->assertEquals(count($arr), 3);
         
         $this->assertEquals($row2->dbAttrForce('passwordhash'), 'changedregewrg'); // saved
         

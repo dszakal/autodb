@@ -201,7 +201,7 @@ class AutoRecord {
                 ' WHERE ' . $where;
             
             if ($limit > 0) {
-                $sqlGet .= ' LIMIT ' . (int)($limit * ($page-1)) . ', ' . (int)$limit;
+                $sqlGet .= ' LIMIT ' . (int)$limit . ' OFFSET ' . (int)($limit * ($page-1));
             }
 
             $result = pg_query($sqlr, $sqlGet);

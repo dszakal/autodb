@@ -4,7 +4,7 @@ A very simple automated single table read-write Active Record Pattern implementa
 
 Old Stable: 000.030
 
-PostgreSQL support (php-pgsql (pg_connect, resource), NOT php-pdo-pgsql) from: 000.040
+PostgreSQL support (php-pgsql (pg_connect, resource), NOT php-pdo-pgsql) from: 000.042
 
 LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
 
@@ -19,8 +19,8 @@ LIMITATIONS TO BE AWARE OF BEFORE YOU WOULD USE:
     If using more AutoDb (more tables or more connections) with Redis table definition caching, you WANT to set different $ident for AutoDb::init()
     If using Redis cache you WANT to purge 'autodbdefs.*' redis keys in your deploy script, or at least you REALLY WANT TO delete it right after running an ALTER TABLE
     Concurrent writing (INSERT IGNORE INTO, REPLACE INTO) is supported, but only via AutoRecord::saveMore(array $arrayOfRecords) which will set saved inserted/replaced references as dead. For limitations see "unit" tests / concurrentWriteTests()
-    We do not support editing of primary keys, but you should do that manually and carefully anyway
-    Supports only databases with AUTO_INCREMENT POSITIVE INTEGER primary keys
+    We do not fully support editing of primary keys, but you should do that manually and carefully anyway
+    Supports only databases with AUTO_INCREMENT (or Serial) POSITIVE INTEGER primary keys
     Everything by AutoDb or AutoRecord will throw a new instance of AutoDbException in all circumstances
     Supports MySQL through mysqli and PostgreSQL through pg_connect + resource
     PDO is not supported, and is not planned to be supported

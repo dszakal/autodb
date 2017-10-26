@@ -257,6 +257,9 @@ class AutoDb {
                         if (strpos($row['column_default'], '::text') !== false) {
                             $default = str_replace('::text', '', $row['column_default']); // 'some_default_value' (WITH TICKS ADDED)
                         }
+                        if (strpos($row['column_default'], '::json') !== false) {
+                            $default = str_replace('::json', '', $row['column_default']); // 'some_default_value' (WITH TICKS ADDED)
+                        }                        
                         if (strpos($row['column_default'], '::') === false) {
                             $default = $row['column_default']; // for example number
                         }
