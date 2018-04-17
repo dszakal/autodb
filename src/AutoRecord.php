@@ -140,7 +140,7 @@ class AutoRecord {
             if (!empty($row)) {
                 $record->initAttrsFromQueryRow($row);
             } else {
-                throw new AutoDbException("AutoDb/Autorecord: error loading record with PKey: " . $sqlGet . " " . $sqlr->error);
+                throw new AutoDbException("AutoDb/Autorecord: error loading record with PKey: " . $sqlGet . " " .  pg_last_error($sqlr));
             }            
             
         }
