@@ -418,16 +418,21 @@ class AutoRecord {
             }
             return (double)$value;
         }
-        
-        if ($default) {
-            return $default; // here it contains the quotes already, :: deleted already
-        }
-        
+
         if (strstr($type, 'date') || strstr($type, 'time')) {
             if ($value === 'NOW()') {
                 return 'NOW()';
             }
         }
+        
+        if (strstr($type, 'text') && strlen($value) > 0) {
+        	return "'" . $this->escape($value) . "'";
+        }
+        
+        if ($default) {
+            return $default; // here it contains the quotes already, :: deleted already
+        }
+        
         return "'" . $this->escape($value) . "'";
     }
     
