@@ -652,6 +652,7 @@ class AutoDbTest extends TestCase
                 uniq_part_2 INT,
                 just_a_number INT DEFAULT 11,
                 testjson json NOT NULL DEFAULT '{}',
+                testjsontwo json DEFAULT '{}',
                 UNIQUE (uniq_part_1, uniq_part_2)
             );            
         ");
@@ -763,7 +764,15 @@ class AutoDbTest extends TestCase
         $test = pg_query($this->pgres, 'SELECT MIN(id_client) as minpk FROM clientinfo');
         
         $this->assertEquals(pg_fetch_assoc($test)['minpk'], -3); // raped primary key in multi insert       
-        
+        $rowj = $this->adbpg->newRow('unikp');
+        $rowj->attr('uniq_part_1', 'jnkwa');
+        $rowj->attr('uniq_part_2', 117);
+        $rowj->attr('testjsontwo', json_encode(array('hello' => 'IamTest')));
+        $rowj->save();
+        // echo $rowj->attr('testjsontwo') . "\n";
+        // echo $rowj->dbAttrForce('testjsontwo') . "\n";
+        $this->assertEquals($rowj->dbAttrForce('testjsontwo'), $rowj->attr('testjsontwo'));
+        $this->assertEquals($rowj->dbAttrForce('testjsontwo'), '{"hello":"IamTest"}');
     }
     
     public function pConcurrencyTests()

@@ -429,7 +429,11 @@ class AutoRecord {
         	return "'" . $this->escape($value) . "'";
         }
         
-        if ($default) {
+        if (strstr($type, 'json') && strlen($value) > 0) {
+            return "'" . $this->escape($value) . "'";
+        }
+        
+        if ($default && (strlen($value) > 0 || $value !== '')) {
             return $default; // here it contains the quotes already, :: deleted already
         }
         
