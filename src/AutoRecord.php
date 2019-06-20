@@ -911,7 +911,7 @@ class AutoRecord {
         if (AutoDb::isPgsqlResource($sqlr)) {
             $pgResult = pg_query($sqlr, $insertQuery);
             if (!$pgResult) {
-                throw new AutoDbException("AutoDb/Autorecord: saveMore(): PgSQL - error inserting new records: " . $sql . " " . pg_last_error($sqlr));
+                throw new AutoDbException("AutoDb/Autorecord: saveMore(): PgSQL - error inserting new records: " . $insertQuery . " " . pg_last_error($sqlr));
             }     
 
             return pg_affected_rows($pgResult);             
