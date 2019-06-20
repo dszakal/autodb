@@ -790,7 +790,7 @@ class AutoRecord {
             }
             
             
-            if ($autoRecord->getPrimaryKeyValue() > 0) {
+            if ($autoRecord->getPrimaryKeyValue() > 0 && $autoRecord->state != 'danger') {
                 $toUpdate[] = $autoRecord;
             } else {
                 $toInsert[] = $autoRecord;
