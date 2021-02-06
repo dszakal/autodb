@@ -817,7 +817,7 @@ class AutoRecord {
      * @return integer - count of updated rows
      * @throws AutoDbException
      */
-    private static final function _saveCheckedArrayOptimised(array $toInsert, $sqlr, $insertCommand, $suffix)
+    private static function _saveCheckedArrayOptimised(array $toInsert, $sqlr, $insertCommand, $suffix)
     {
         $insertQuery = '';
         $columns = array(); // to make sure attributes are in order
