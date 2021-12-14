@@ -1,5 +1,9 @@
 # Autodb
 
+BREAKING NEWS: As of PHP 8.1 pg_connect returns a diffferent object, so:
+LATEST SUPPORTED VERSION: PHP 8.0.x
+CURRENT RELEASE NOT WORKING WITH: PHP 8.1.0 or later
+
 A very simple automated single table read-write Active Record Pattern implementation.
 
 Old Stable: 000.030
