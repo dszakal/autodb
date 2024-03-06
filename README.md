@@ -1,14 +1,16 @@
 # Autodb
 
-BREAKING NEWS: As of PHP 8.1 pg_connect returns a diffferent object, so:
+<h3>This is a modified version of the original dszakal/autodb</h3>
+<h3>This minimum requirement is now PHP 8.1.</h3>
 
-LATEST SUPPORTED VERSION: PHP 8.0.x
 
-CURRENT RELEASE NOT WORKING WITH: PHP 8.1.0 or later
+LATEST SUPPORTED VERSION: PHP 8.3.3
+
+CURRENT RELEASE NOT WORKING WITH: PHP 7.4 or previous
 
 A very simple automated single table read-write Active Record Pattern implementation.
 
-Old Stable: 000.030
+Old Stable: 000.030 (for previous PHP versions)
 
 PostgreSQL support (php-pgsql (pg_connect, resource), NOT php-pdo-pgsql) from: 000.042
 
