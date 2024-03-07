@@ -1,7 +1,18 @@
 # Autodb
 
-BREAKING NEWS: As of PHP 8.1 pg_connect returns a diffferent object, so:
+### BREAKING NEWS: The package is not maintained by myself (dszakal) further. Kept here as you may still wish to use for legacy PHP <8.1 systems.
 
+### BREAKING NEWS: New approved maintained upstream is this fork for PHP >= 8.1: https://github.com/salvosav/autodb 
+
+#### The new official maintainer is `salvosav` - please use `salvosav/autodb` in composer.json for PHP >= 8.1
+
+#### Last `oldstable` dszakal version tag: `000.061` - that's where my work has been finished
+
+#### -
+
+#### Old README below:
+
+As of PHP 8.1 pg_connect returns a different object, so:
 LATEST SUPPORTED VERSION: PHP 8.0.x
 
 CURRENT RELEASE NOT WORKING WITH: PHP 8.1.0 or later
